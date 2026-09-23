@@ -2,9 +2,11 @@ import re
 
 user_identifier_regex = re.compile(r"""
 ^
-  ([A-Z]|[0-9])+    # Começa com um ou mais caracteres alfanuméricos
-  ([A-Z]|[0-9]|-)*  # Mas pode ter um hífen depois do primeiro
-  ([A-Z]|[0-9])?    # E obriga a fechar com um alfanumérico (sem o hífen)
+  [A-Z]|[0-9]    # Começa com um ou mais caracteres alfanuméricos
+  (
+    [A-Z0-9\-]*   # Mas pode ter um hífen depois do primeiro
+    [A-Z]|[0-9]
+  )?  # E obriga a fechar com um alfanumérico (sem o hífen)
 $
 """, re.VERBOSE)
 
