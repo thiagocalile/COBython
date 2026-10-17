@@ -1,3 +1,8 @@
+# Integrantes do grupo 9:
+#   Thiago Costa    - Nº USP 14609529
+#   Oliver Kuramae  - Nº USP 14601326
+#   Theo Brito      - Nº USP 13688367
+
 import os
 import re
 import sys
