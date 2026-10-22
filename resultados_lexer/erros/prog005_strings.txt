@@ -1,0 +1,245 @@
+LINHA   | COL   | ÁREA       | TIPO DO TOKEN             | VALOR
+----------------------------------------------------------------------
+11      | 8     | AREA_A     | IDENTIFICATION            | IDENTIFICATION
+11      | 23    | AREA_B     | DIVISION                  | DIVISION
+11      | 31    | AREA_B     | DOT                       | .
+12      | 8     | AREA_A     | PROGRAM-ID                | PROGRAM-ID
+12      | 18    | AREA_B     | DOT                       | .
+12      | 20    | AREA_B     | ERROR_INVALID_ID          | PROG008_STRING
+12      | 34    | AREA_B     | DOT                       | .
+13      | 8     | AREA_A     | DATA                      | DATA
+13      | 13    | AREA_B     | DIVISION                  | DIVISION
+13      | 21    | AREA_B     | DOT                       | .
+14      | 8     | AREA_A     | FILE                      | FILE
+14      | 13    | AREA_B     | SECTION                   | SECTION
+14      | 20    | AREA_B     | DOT                       | .
+15      | 8     | AREA_A     | WORKING-STORAGE           | WORKING-STORAGE
+15      | 24    | AREA_B     | SECTION                   | SECTION
+15      | 31    | AREA_B     | DOT                       | .
+17      | 8     | AREA_A     | NUMBER                    | 77
+17      | 11    | AREA_A     | VALID_ID                  | SAUX
+17      | 27    | AREA_B     | PIC                       | PIC
+17      | 31    | AREA_B     | PIC_STRING                | X(15)
+17      | 36    | AREA_B     | DOT                       | .
+18      | 8     | AREA_A     | NUMBER                    | 77
+18      | 11    | AREA_A     | ERROR_INVALID_ID          | CONT@
+18      | 27    | AREA_B     | PIC                       | PIC
+18      | 31    | AREA_B     | PIC_STRING                | 9(2)
+18      | 35    | AREA_B     | DOT                       | .
+19      | 8     | AREA_A     | NUMBER                    | 77
+19      | 11    | AREA_A     | VALID_ID                  | YESNO
+19      | 27    | AREA_B     | PIC                       | PIC
+19      | 31    | AREA_B     | PIC_STRING                | 9
+19      | 32    | AREA_B     | DOT                       | .
+21      | 8     | AREA_A     | NUMBER                    | 77
+21      | 11    | AREA_A     | VALID_ID                  | IDX
+21      | 15    | AREA_B     | PIC                       | PIC
+21      | 19    | AREA_B     | PIC_STRING                | 9(1)
+21      | 23    | AREA_B     | DOT                       | .
+23      | 8     | AREA_A     | PROCEDURE                 | PROCEDURE
+23      | 18    | AREA_B     | DIVISION                  | DIVISION
+23      | 26    | AREA_B     | DOT                       | .
+24      | 8     | AREA_A     | VALID_ID                  | MAIN-PROCEDURE
+24      | 22    | AREA_B     | DOT                       | .
+25      | 13    | AREA_B     | MOVE                      | MOVE
+25      | 18    | AREA_B     | ALPHANUMERIC_LITERAL      | HELLO WORLD 123!!
+25      | 38    | AREA_B     | TO                        | TO
+25      | 41    | AREA_B     | VALID_ID                  | SAUX
+25      | 45    | AREA_B     | DOT                       | .
+27      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+27      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+27      | 24    | AREA_B     | DOT                       | .
+28      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+28      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | ==== EXEMPLO 1 ====
+28      | 42    | AREA_B     | DOT                       | .
+29      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+29      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+29      | 30    | AREA_B     | VALID_ID                  | SAUX
+29      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | '
+29      | 38    | AREA_B     | DOT                       | .
+31      | 13    | AREA_B     | MOVE                      | MOVE
+31      | 18    | AREA_B     | NUMBER                    | 0
+31      | 20    | AREA_B     | TO                        | TO
+31      | 23    | AREA_B     | VALID_ID                  | CONT
+31      | 27    | AREA_B     | DOT                       | .
+32      | 13    | AREA_B     | VALID_ID                  | INSPECT
+32      | 21    | AREA_B     | VALID_ID                  | SAUX
+32      | 26    | AREA_B     | VALID_ID                  | TALLYING
+32      | 35    | AREA_B     | VALID_ID                  | CONT
+32      | 40    | AREA_B     | VALID_ID                  | FOR
+32      | 44    | AREA_B     | VALID_ID                  | CHARACTERS
+32      | 54    | AREA_B     | DOT                       | .
+33      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+33      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | CONT=
+33      | 29    | AREA_B     | VALID_ID                  | CONT
+33      | 34    | AREA_B     | ALPHANUMERIC_LITERAL      |  - FOR CHARACTERS
+33      | 53    | AREA_B     | DOT                       | .
+35      | 13    | AREA_B     | MOVE                      | MOVE
+35      | 18    | AREA_B     | NUMBER                    | 0
+35      | 20    | AREA_B     | TO                        | TO
+35      | 23    | AREA_B     | VALID_ID                  | CONT
+35      | 27    | AREA_B     | DOT                       | .
+36      | 13    | AREA_B     | VALID_ID                  | INSPECT
+36      | 21    | AREA_B     | VALID_ID                  | SAUX
+36      | 26    | AREA_B     | VALID_ID                  | TALLYING
+36      | 35    | AREA_B     | VALID_ID                  | CONT
+36      | 40    | AREA_B     | VALID_ID                  | FOR
+36      | 44    | AREA_B     | VALID_ID                  | ALL
+36      | 48    | AREA_B     | ALPHANUMERIC_LITERAL      | L
+36      | 51    | AREA_B     | DOT                       | .
+37      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+37      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | CONT=
+37      | 29    | AREA_B     | VALID_ID                  | CONT
+37      | 34    | AREA_B     | ALPHANUMERIC_LITERAL      |  - FOR ALL 'L'
+37      | 50    | AREA_B     | DOT                       | .
+39      | 13    | AREA_B     | MOVE                      | MOVE
+39      | 18    | AREA_B     | NUMBER                    | 0
+39      | 20    | AREA_B     | TO                        | TO
+39      | 23    | AREA_B     | VALID_ID                  | CONT
+39      | 27    | AREA_B     | DOT                       | .
+40      | 13    | AREA_B     | VALID_ID                  | INSPECT
+40      | 21    | AREA_B     | VALID_ID                  | SAUX
+40      | 26    | AREA_B     | VALID_ID                  | TALLYING
+40      | 35    | AREA_B     | VALID_ID                  | CONT
+41      | 21    | AREA_B     | VALID_ID                  | FOR
+41      | 25    | AREA_B     | VALID_ID                  | CHARACTERS
+41      | 36    | AREA_B     | VALID_ID                  | BEFORE
+41      | 43    | AREA_B     | VALID_ID                  | INITIAL
+41      | 51    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+41      | 54    | AREA_B     | DOT                       | .
+42      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+42      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | CONT=
+42      | 29    | AREA_B     | VALID_ID                  | CONT
+42      | 34    | AREA_B     | ALPHANUMERIC_LITERAL      |  - BEFORE INITIAL ' '
+42      | 57    | AREA_B     | DOT                       | .
+44      | 13    | AREA_B     | MOVE                      | MOVE
+44      | 18    | AREA_B     | NUMBER                    | 0
+44      | 20    | AREA_B     | TO                        | TO
+44      | 23    | AREA_B     | VALID_ID                  | CONT
+44      | 27    | AREA_B     | DOT                       | .
+45      | 13    | AREA_B     | VALID_ID                  | INSPECT
+45      | 21    | AREA_B     | VALID_ID                  | SAUX
+45      | 26    | AREA_B     | VALID_ID                  | TALLYING
+45      | 35    | AREA_B     | VALID_ID                  | CONT
+46      | 21    | AREA_B     | VALID_ID                  | FOR
+46      | 25    | AREA_B     | VALID_ID                  | CHARACTERS
+46      | 36    | AREA_B     | VALID_ID                  | AFTER
+46      | 42    | AREA_B     | VALID_ID                  | INITIAL
+46      | 50    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+46      | 53    | AREA_B     | DOT                       | .
+47      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+47      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | CONT=
+47      | 29    | AREA_B     | VALID_ID                  | CONT
+47      | 34    | AREA_B     | ALPHANUMERIC_LITERAL      |  - AFTER INITIAL ' '
+47      | 56    | AREA_B     | DOT                       | .
+49      | 13    | AREA_B     | MOVE                      | MOVE
+49      | 18    | AREA_B     | NUMBER                    | 0
+49      | 20    | AREA_B     | TO                        | TO
+49      | 23    | AREA_B     | VALID_ID                  | YESNO
+49      | 28    | AREA_B     | DOT                       | .
+50      | 13    | AREA_B     | VALID_ID                  | INSPECT
+50      | 21    | AREA_B     | VALID_ID                  | SAUX
+50      | 26    | AREA_B     | VALID_ID                  | TALLYING
+50      | 35    | AREA_B     | VALID_ID                  | YESNO
+51      | 21    | AREA_B     | VALID_ID                  | FOR
+51      | 25    | AREA_B     | VALID_ID                  | LEADING
+51      | 33    | AREA_B     | ALPHANUMERIC_LITERAL      | H
+51      | 36    | AREA_B     | DOT                       | .
+52      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+52      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | YESNO=
+52      | 30    | AREA_B     | VALID_ID                  | YESNO
+52      | 36    | AREA_B     | ALPHANUMERIC_LITERAL      |  - FOR LEADING 'H' 0=N / 1=Y
+52      | 66    | AREA_B     | DOT                       | .
+54      | 13    | AREA_B     | VALID_ID                  | INSPECT
+54      | 21    | AREA_B     | VALID_ID                  | SAUX
+54      | 26    | AREA_B     | VALID_ID                  | REPLACING
+54      | 36    | AREA_B     | VALID_ID                  | FIRST
+54      | 42    | AREA_B     | ALPHANUMERIC_LITERAL      | E
+54      | 46    | AREA_B     | VALID_ID                  | BY
+54      | 49    | AREA_B     | ALPHANUMERIC_LITERAL      | A
+54      | 52    | AREA_B     | DOT                       | .
+55      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+55      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+55      | 30    | AREA_B     | VALID_ID                  | SAUX
+55      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | ' - REPLACING FIRST 'E' BY 'A'
+55      | 67    | AREA_B     | DOT                       | .
+57      | 13    | AREA_B     | VALID_ID                  | INSPECT
+57      | 21    | AREA_B     | VALID_ID                  | SAUX
+57      | 26    | AREA_B     | VALID_ID                  | REPLACING
+57      | 36    | AREA_B     | VALID_ID                  | ALL
+57      | 40    | AREA_B     | ALPHANUMERIC_LITERAL      | LLO
+57      | 46    | AREA_B     | VALID_ID                  | BY
+57      | 49    | AREA_B     | ALPHANUMERIC_LITERAL      | PPY
+57      | 54    | AREA_B     | DOT                       | .
+58      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+58      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+58      | 30    | AREA_B     | VALID_ID                  | SAUX
+58      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | ' - REPLACING ALL 'LLO' BY 'PPY'
+58      | 69    | AREA_B     | DOT                       | .
+60      | 13    | AREA_B     | MOVE                      | MOVE
+60      | 18    | AREA_B     | ALPHANUMERIC_LITERAL      |  HOLA-DAY
+60      | 30    | AREA_B     | TO                        | TO
+60      | 33    | AREA_B     | VALID_ID                  | SAUX
+60      | 37    | AREA_B     | DOT                       | .
+61      | 13    | AREA_B     | VALID_ID                  | INSPECT
+61      | 21    | AREA_B     | VALID_ID                  | SAUX
+61      | 26    | AREA_B     | VALID_ID                  | REPLACING
+61      | 36    | AREA_B     | VALID_ID                  | ALL
+61      | 40    | AREA_B     | ALPHANUMERIC_LITERAL      | HOLA
+61      | 47    | AREA_B     | VALID_ID                  | BY
+61      | 50    | AREA_B     | ALPHANUMERIC_LITERAL      | GOOD
+62      | 21    | AREA_B     | VALID_ID                  | AFTER
+62      | 27    | AREA_B     | VALID_ID                  | INITIAL
+62      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+62      | 39    | AREA_B     | VALID_ID                  | BEFORE
+62      | 46    | AREA_B     | VALID_ID                  | INITIAL
+62      | 54    | AREA_B     | ALPHANUMERIC_LITERAL      | -
+62      | 57    | AREA_B     | DOT                       | .
+63      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+63      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+63      | 30    | AREA_B     | VALID_ID                  | SAUX
+63      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | ' - HOLA-DAY TO GOOD-DAY'
+63      | 62    | AREA_B     | DOT                       | .
+65      | 13    | AREA_B     | MOVE                      | MOVE
+65      | 18    | AREA_B     | ALPHANUMERIC_LITERAL      | HELLO WORLD
+65      | 32    | AREA_B     | TO                        | TO
+65      | 35    | AREA_B     | VALID_ID                  | SAUX
+65      | 39    | AREA_B     | DOT                       | .
+66      | 13    | AREA_B     | VALID_ID                  | INSPECT
+66      | 21    | AREA_B     | VALID_ID                  | SAUX
+66      | 26    | AREA_B     | VALID_ID                  | CONVERTING
+66      | 37    | AREA_B     | ALPHANUMERIC_LITERAL      | ABCDEFGHIJKLMNOPQRSTUVWXZ
+67      | 17    | AREA_B     | TO                        | TO
+67      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | abcdefghijklmnopqrstuvwxz
+67      | 47    | AREA_B     | DOT                       | .
+68      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+68      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+68      | 30    | AREA_B     | VALID_ID                  | SAUX
+68      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | ' - CONVERTING'
+68      | 52    | AREA_B     | DOT                       | .
+70      | 13    | AREA_B     | VALID_ID                  | INSPECT
+70      | 21    | AREA_B     | VALID_ID                  | SAUX
+70      | 26    | AREA_B     | VALID_ID                  | REPLACING
+70      | 36    | AREA_B     | VALID_ID                  | CHARACTERS
+70      | 47    | AREA_B     | VALID_ID                  | BY
+70      | 50    | AREA_B     | ALPHANUMERIC_LITERAL      | F
+70      | 53    | AREA_B     | DOT                       | .
+71      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+71      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | SAUX='
+71      | 30    | AREA_B     | VALID_ID                  | SAUX
+71      | 35    | AREA_B     | ALPHANUMERIC_LITERAL      | ' - REPLACING 
+71      | 51    | AREA_B     | DOT                       | .
+73      | 12    | AREA_B     | STOP                      | STOP
+73      | 17    | AREA_B     | RUN                       | RUN
+73      | 20    | AREA_B     | DOT                       | .
+75      | 8     | AREA_A     | VALID_ID                  | END
+75      | 12    | AREA_B     | VALID_ID                  | PROGRAM
+75      | 20    | AREA_B     | ERROR_INVALID_ID          | PROG008_STRING
+75      | 34    | AREA_B     | DOT                       | .
+
+SEV   | LINHA   | COL   | MENSAGEM
+----------------------------------------------------------------------
+E     | 12      | 20    | Palavra inválida: 'PROG008_STRING'
+E     | 18      | 11    | Palavra inválida: 'CONT@'
+W     | 31      | 7     | Indicador de continuação sem literal alfanumérico ou palavra para continuar
+E     | 75      | 20    | Palavra inválida: 'PROG008_STRING'

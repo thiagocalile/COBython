@@ -1,0 +1,326 @@
+LINHA   | COL   | ÁREA       | TIPO DO TOKEN             | VALOR
+----------------------------------------------------------------------
+11      | 8     | AREA_A     | IDENTIFICATION            | IDENTIFICATION
+11      | 23    | AREA_B     | DIVISION                  | DIVISION
+11      | 31    | AREA_B     | DOT                       | .
+12      | 8     | AREA_A     | PROGRAM-ID                | PROGRAM-ID
+12      | 18    | AREA_B     | DOT                       | .
+12      | 20    | AREA_B     | VALID_ID                  | YOUR-PROGRAM-NAME
+12      | 37    | AREA_B     | DOT                       | .
+13      | 8     | AREA_A     | DATA                      | DATA
+13      | 13    | AREA_B     | DIVISION                  | DIVISION
+13      | 21    | AREA_B     | DOT                       | .
+14      | 8     | AREA_A     | FILE                      | FILE
+14      | 13    | AREA_B     | SECTION                   | SECTION
+14      | 20    | AREA_B     | DOT                       | .
+15      | 8     | AREA_A     | WORKING-STORAGE           | WORKING-STORAGE
+15      | 24    | AREA_B     | SECTION                   | SECTION
+15      | 31    | AREA_B     | DOT                       | .
+16      | 12    | AREA_B     | NUMBER                    | 77
+16      | 15    | AREA_B     | VALID_ID                  | WRK-VALOR1
+16      | 32    | AREA_B     | PIC                       | PIC
+16      | 36    | AREA_B     | PIC_STRING                | 9(10)
+16      | 42    | AREA_B     | VALID_ID                  | VALUES
+16      | 49    | AREA_B     | NUMBER                    | 10
+16      | 51    | AREA_B     | DOT                       | .
+17      | 12    | AREA_B     | NUMBER                    | 77
+17      | 15    | AREA_B     | VALID_ID                  | WRK-VALOR2
+17      | 32    | AREA_B     | PIC                       | PIC
+17      | 36    | AREA_B     | PIC_STRING                | 9(10)
+17      | 42    | AREA_B     | VALID_ID                  | VALUES
+17      | 49    | AREA_B     | VALID_ID                  | ZEROS
+17      | 54    | AREA_B     | DOT                       | .
+18      | 12    | AREA_B     | NUMBER                    | 77
+18      | 15    | AREA_B     | VALID_ID                  | WRK-A
+18      | 32    | AREA_B     | PIC                       | PIC
+18      | 36    | AREA_B     | PIC_STRING                | 9(2)
+18      | 41    | AREA_B     | VALID_ID                  | VALUES
+18      | 48    | AREA_B     | NUMBER                    | 1
+18      | 49    | AREA_B     | DOT                       | .
+19      | 12    | AREA_B     | NUMBER                    | 77
+19      | 15    | AREA_B     | VALID_ID                  | WRK-B
+19      | 32    | AREA_B     | PIC                       | PIC
+19      | 36    | AREA_B     | PIC_STRING                | 9(2)
+19      | 41    | AREA_B     | VALID_ID                  | VALUES
+19      | 48    | AREA_B     | NUMBER                    | 1
+19      | 49    | AREA_B     | DOT                       | .
+20      | 12    | AREA_B     | NUMBER                    | 77
+20      | 15    | AREA_B     | VALID_ID                  | WRK-C
+20      | 32    | AREA_B     | PIC                       | PIC
+20      | 36    | AREA_B     | PIC_STRING                | 9(2)
+20      | 41    | AREA_B     | VALID_ID                  | VALUES
+20      | 48    | AREA_B     | VALID_ID                  | ZEROS
+20      | 53    | AREA_B     | DOT                       | .
+22      | 12    | AREA_B     | NUMBER                    | 01
+22      | 15    | AREA_B     | VALID_ID                  | WRK-TOTAIS
+22      | 25    | AREA_B     | DOT                       | .
+23      | 15    | AREA_B     | NUMBER                    | 05
+23      | 18    | AREA_B     | VALID_ID                  | WRK-TOTAL
+23      | 32    | AREA_B     | PIC                       | PIC
+23      | 36    | AREA_B     | PIC_STRING                | 9(10)
+23      | 42    | AREA_B     | VALUE                     | VALUE
+23      | 48    | AREA_B     | NUMBER                    | 19
+23      | 50    | AREA_B     | DOT                       | .
+25      | 8     | AREA_A     | PROCEDURE                 | PROCEDURE
+25      | 18    | AREA_B     | DIVISION                  | DIVISION
+25      | 26    | AREA_B     | DOT                       | .
+26      | 8     | AREA_A     | VALID_ID                  | MAIN-PROCEDURE
+26      | 22    | AREA_B     | DOT                       | .
+27      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+27      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ===== start =======
+27      | 41    | AREA_B     | DOT                       | .
+28      | 12    | AREA_B     | MOVE                      | MOVE
+28      | 17    | AREA_B     | NUMBER                    | 20
+28      | 20    | AREA_B     | TO                        | TO
+28      | 23    | AREA_B     | VALID_ID                  | WRK-VALOR2
+28      | 33    | AREA_B     | DOT                       | .
+29      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+29      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MOVE 20 TO WRK-VALOR2 -->
+29      | 48    | AREA_B     | VALID_ID                  | WRK-VALOR2
+29      | 58    | AREA_B     | DOT                       | .
+31      | 12    | AREA_B     | MOVE                      | MOVE
+31      | 17    | AREA_B     | VALID_ID                  | WRK-VALOR1
+31      | 28    | AREA_B     | TO                        | TO
+31      | 31    | AREA_B     | VALID_ID                  | WRK-VALOR2
+31      | 41    | AREA_B     | DOT                       | .
+32      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+32      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MOVE WRK-VALOR1 TO WRK-VALOR2 -->
+32      | 56    | AREA_B     | VALID_ID                  | WRK-VALOR2
+32      | 66    | AREA_B     | DOT                       | .
+34      | 12    | AREA_B     | MOVE                      | MOVE
+34      | 17    | AREA_B     | NUMBER                    | 70
+34      | 20    | AREA_B     | TO                        | TO
+34      | 23    | AREA_B     | VALID_ID                  | WRK-VALOR1
+34      | 34    | AREA_B     | VALID_ID                  | WRK-VALOR2
+34      | 44    | AREA_B     | DOT                       | .
+35      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+35      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MOVE 70 TO WRK-VALOR1 WRK-VALOR2 -->
+35      | 59    | AREA_B     | VALID_ID                  | WRK-VALOR2
+35      | 69    | AREA_B     | DOT                       | .
+37      | 12    | AREA_B     | MOVE                      | MOVE
+37      | 17    | AREA_B     | VALID_ID                  | WRK-TOTAL
+37      | 27    | AREA_B     | OF                        | OF
+37      | 30    | AREA_B     | VALID_ID                  | WRK-TOTAIS
+37      | 41    | AREA_B     | TO                        | TO
+37      | 44    | AREA_B     | VALID_ID                  | WRK-VALOR2
+37      | 54    | AREA_B     | DOT                       | .
+38      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+38      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MOVE WRK-TOTAL OF WRK-TOTAIS TO WRK-VALOR2. -->
+39      | 22    | AREA_B     | VALID_ID                  | WRK-VALOR2
+39      | 32    | AREA_B     | DOT                       | .
+41      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+41      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | --------
+41      | 30    | AREA_B     | DOT                       | .
+42      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+42      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A = 1, B = 1, C = 1
+42      | 41    | AREA_B     | DOT                       | .
+44      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+44      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+44      | 23    | AREA_B     | DOT                       | .
+45      | 12    | AREA_B     | VALID_ID                  | ADD
+45      | 16    | AREA_B     | NUMBER                    | 1
+45      | 18    | AREA_B     | NUMBER                    | 1
+45      | 20    | AREA_B     | TO                        | TO
+45      | 23    | AREA_B     | VALID_ID                  | WRK-A
+45      | 28    | AREA_B     | DOT                       | .
+46      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+46      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ADD B C TO A (A = B + C + A) -->
+46      | 55    | AREA_B     | VALID_ID                  | WRK-A
+46      | 60    | AREA_B     | DOT                       | .
+48      | 12    | AREA_B     | MOVE                      | MOVE
+48      | 17    | AREA_B     | NUMBER                    | 1
+48      | 19    | AREA_B     | TO                        | TO
+48      | 22    | AREA_B     | VALID_ID                  | WRK-A
+48      | 27    | AREA_B     | DOT                       | .
+49      | 12    | AREA_B     | VALID_ID                  | ADD
+49      | 16    | AREA_B     | NUMBER                    | 1
+49      | 18    | AREA_B     | TO                        | TO
+49      | 21    | AREA_B     | VALID_ID                  | WRK-A
+49      | 27    | AREA_B     | VALID_ID                  | WRK-B
+49      | 32    | AREA_B     | DOT                       | .
+50      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+50      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+50      | 23    | AREA_B     | DOT                       | .
+51      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+51      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ADD 1 TO A B (A = A + 1; B = B + 1) -->
+52      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+52      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 
+52      | 26    | AREA_B     | VALID_ID                  | WRK-A
+52      | 32    | AREA_B     | ALPHANUMERIC_LITERAL      |  , B= 
+52      | 41    | AREA_B     | VALID_ID                  | WRK-B
+52      | 46    | AREA_B     | DOT                       | .
+54      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+54      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+54      | 23    | AREA_B     | DOT                       | .
+55      | 12    | AREA_B     | VALID_ID                  | ADD
+55      | 16    | AREA_B     | NUMBER                    | 1
+55      | 18    | AREA_B     | NUMBER                    | 1
+55      | 20    | AREA_B     | VALID_ID                  | GIVING
+55      | 27    | AREA_B     | VALID_ID                  | WRK-A
+55      | 32    | AREA_B     | DOT                       | .
+56      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+56      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ADD B C GIVING A (A = B + C) -->
+56      | 55    | AREA_B     | VALID_ID                  | WRK-A
+56      | 60    | AREA_B     | DOT                       | .
+58      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+58      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ============ SUBTRACT ============= 
+58      | 58    | AREA_B     | DOT                       | .
+59      | 12    | AREA_B     | MOVE                      | MOVE
+59      | 17    | AREA_B     | NUMBER                    | 99
+59      | 20    | AREA_B     | TO                        | TO
+59      | 23    | AREA_B     | VALID_ID                  | WRK-A
+59      | 28    | AREA_B     | DOT                       | .
+60      | 12    | AREA_B     | MOVE                      | MOVE
+60      | 17    | AREA_B     | NUMBER                    | 0
+60      | 19    | AREA_B     | TO                        | TO
+60      | 22    | AREA_B     | VALID_ID                  | WRK-B
+60      | 27    | AREA_B     | DOT                       | .
+61      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+61      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 99, B= 0
+61      | 33    | AREA_B     | DOT                       | .
+62      | 12    | AREA_B     | VALID_ID                  | SUBTRACT
+62      | 21    | AREA_B     | NUMBER                    | 30
+62      | 24    | AREA_B     | NUMBER                    | 23
+62      | 27    | AREA_B     | VALID_ID                  | FROM
+62      | 32    | AREA_B     | VALID_ID                  | WRK-A
+63      | 27    | AREA_B     | VALID_ID                  | GIVING
+63      | 34    | AREA_B     | VALID_ID                  | WRK-B
+63      | 39    | AREA_B     | DOT                       | .
+64      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+64      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | SUBTRACT 30 23 FROM A GIVING B.-->
+65      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+65      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 
+65      | 26    | AREA_B     | VALID_ID                  | WRK-A
+65      | 32    | AREA_B     | ALPHANUMERIC_LITERAL      |  , B= 
+65      | 41    | AREA_B     | VALID_ID                  | WRK-B
+65      | 46    | AREA_B     | DOT                       | .
+67      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+67      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ============ MULTIPLY ============= 
+67      | 58    | AREA_B     | DOT                       | .
+68      | 12    | AREA_B     | MOVE                      | MOVE
+68      | 17    | AREA_B     | NUMBER                    | 40
+68      | 20    | AREA_B     | TO                        | TO
+68      | 23    | AREA_B     | VALID_ID                  | WRK-A
+68      | 28    | AREA_B     | DOT                       | .
+69      | 12    | AREA_B     | MOVE                      | MOVE
+69      | 17    | AREA_B     | NUMBER                    | 0
+69      | 19    | AREA_B     | TO                        | TO
+69      | 22    | AREA_B     | VALID_ID                  | WRK-B
+69      | 27    | AREA_B     | DOT                       | .
+70      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+70      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 40, B= 0
+70      | 33    | AREA_B     | DOT                       | .
+71      | 12    | AREA_B     | VALID_ID                  | MULTIPLY
+71      | 21    | AREA_B     | NUMBER                    | 2
+71      | 23    | AREA_B     | VALID_ID                  | BY
+71      | 26    | AREA_B     | VALID_ID                  | WRK-A
+71      | 31    | AREA_B     | DOT                       | .
+72      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+72      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MULTIPLY A BY 2 -->
+73      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+73      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 
+73      | 26    | AREA_B     | VALID_ID                  | WRK-A
+73      | 32    | AREA_B     | ALPHANUMERIC_LITERAL      |  , B= 
+73      | 41    | AREA_B     | VALID_ID                  | WRK-B
+73      | 46    | AREA_B     | DOT                       | .
+75      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+75      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ============ MULTIPLY ============= 
+75      | 58    | AREA_B     | DOT                       | .
+76      | 12    | AREA_B     | MOVE                      | MOVE
+76      | 17    | AREA_B     | NUMBER                    | 40
+76      | 20    | AREA_B     | TO                        | TO
+76      | 23    | AREA_B     | VALID_ID                  | WRK-A
+76      | 28    | AREA_B     | DOT                       | .
+77      | 12    | AREA_B     | MOVE                      | MOVE
+77      | 17    | AREA_B     | NUMBER                    | 0
+77      | 19    | AREA_B     | TO                        | TO
+77      | 22    | AREA_B     | VALID_ID                  | WRK-B
+77      | 27    | AREA_B     | DOT                       | .
+78      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+78      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 40, B= 0
+78      | 33    | AREA_B     | DOT                       | .
+79      | 12    | AREA_B     | VALID_ID                  | MULTIPLY
+79      | 21    | AREA_B     | NUMBER                    | 2
+79      | 23    | AREA_B     | VALID_ID                  | BY
+79      | 26    | AREA_B     | VALID_ID                  | WRK-A
+79      | 32    | AREA_B     | VALID_ID                  | GIVING
+79      | 39    | AREA_B     | VALID_ID                  | WRK-B
+79      | 44    | AREA_B     | DOT                       | .
+80      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+80      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | MULTIPLY A BY 2 GIVING B.-->
+81      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+81      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 
+81      | 26    | AREA_B     | VALID_ID                  | WRK-A
+81      | 32    | AREA_B     | ALPHANUMERIC_LITERAL      |  , B= 
+81      | 41    | AREA_B     | VALID_ID                  | WRK-B
+81      | 46    | AREA_B     | DOT                       | .
+83      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+83      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | ============ DIVIDE =============
+83      | 55    | AREA_B     | DOT                       | .
+84      | 12    | AREA_B     | MOVE                      | MOVE
+84      | 17    | AREA_B     | NUMBER                    | 81
+84      | 20    | AREA_B     | TO                        | TO
+84      | 23    | AREA_B     | VALID_ID                  | WRK-A
+84      | 28    | AREA_B     | DOT                       | .
+85      | 12    | AREA_B     | MOVE                      | MOVE
+85      | 17    | AREA_B     | NUMBER                    | 0
+85      | 19    | AREA_B     | TO                        | TO
+85      | 22    | AREA_B     | VALID_ID                  | WRK-B
+85      | 27    | AREA_B     | DOT                       | .
+86      | 12    | AREA_B     | MOVE                      | MOVE
+86      | 17    | AREA_B     | NUMBER                    | 0
+86      | 19    | AREA_B     | TO                        | TO
+86      | 22    | AREA_B     | VALID_ID                  | WRK-C
+86      | 27    | AREA_B     | DOT                       | .
+87      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+87      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 80, B= 0
+87      | 33    | AREA_B     | DOT                       | .
+88      | 12    | AREA_B     | VALID_ID                  | DIVIDE
+88      | 19    | AREA_B     | VALID_ID                  | WRK-A
+88      | 25    | AREA_B     | VALID_ID                  | BY
+88      | 28    | AREA_B     | NUMBER                    | 2
+88      | 30    | AREA_B     | VALID_ID                  | GIVING
+88      | 37    | AREA_B     | VALID_ID                  | WRK-B
+88      | 43    | AREA_B     | VALID_ID                  | REMAINDER
+88      | 53    | AREA_B     | VALID_ID                  | WRK-C
+88      | 58    | AREA_B     | DOT                       | .
+89      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+89      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | DIVIDE A BY 2 GIVING B REMAINDER C .-->
+90      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+90      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      | A= 
+90      | 26    | AREA_B     | VALID_ID                  | WRK-A
+90      | 32    | AREA_B     | ALPHANUMERIC_LITERAL      |  , B= 
+90      | 41    | AREA_B     | VALID_ID                  | WRK-B
+90      | 47    | AREA_B     | ALPHANUMERIC_LITERAL      |  , C= 
+90      | 56    | AREA_B     | VALID_ID                  | WRK-C
+90      | 61    | AREA_B     | DOT                       | .
+93      | 12    | AREA_B     | DISPLAY                   | DISPLAY
+93      | 20    | AREA_B     | ALPHANUMERIC_LITERAL      |  
+93      | 23    | AREA_B     | DOT                       | .
+94      | 12    | AREA_B     | MOVE                      | MOVE
+94      | 17    | AREA_B     | NUMBER                    | 99
+94      | 20    | AREA_B     | TO                        | TO
+94      | 23    | AREA_B     | VALID_ID                  | WRK-A
+94      | 28    | AREA_B     | DOT                       | .
+95      | 12    | AREA_B     | VALID_ID                  | ADD
+95      | 16    | AREA_B     | NUMBER                    | 1
+95      | 18    | AREA_B     | TO                        | TO
+95      | 21    | AREA_B     | VALID_ID                  | WRK-A
+96      | 12    | AREA_B     | VALID_ID                  | ON
+96      | 15    | AREA_B     | VALID_ID                  | SIZE
+96      | 20    | AREA_B     | VALID_ID                  | ERROR
+97      | 15    | AREA_B     | DISPLAY                   | DISPLAY
+97      | 23    | AREA_B     | ALPHANUMERIC_LITERAL      | ON SIZE ERROR -->
+97      | 43    | AREA_B     | VALID_ID                  | WRK-A
+97      | 48    | AREA_B     | DOT                       | .
+99      | 13    | AREA_B     | STOP                      | STOP
+99      | 18    | AREA_B     | RUN                       | RUN
+99      | 21    | AREA_B     | DOT                       | .
+100     | 8     | AREA_A     | VALID_ID                  | END
+100     | 12    | AREA_B     | VALID_ID                  | PROGRAM
+100     | 20    | AREA_B     | VALID_ID                  | YOUR-PROGRAM-NAME
+100     | 37    | AREA_B     | DOT                       | .
+
+SEV   | LINHA   | COL   | MENSAGEM
+----------------------------------------------------------------------
+W     | 39      | 7     | Indicador de continuação sem literal alfanumérico ou palavra para continuar

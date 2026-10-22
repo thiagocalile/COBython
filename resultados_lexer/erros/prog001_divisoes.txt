@@ -1,0 +1,60 @@
+LINHA   | COL   | ÁREA       | TIPO DO TOKEN             | VALOR
+----------------------------------------------------------------------
+15      | 8     | AREA_A     | IDENTIFICATION            | IDENTIFICATION
+15      | 23    | AREA_B     | DIVISION                  | DIVISION
+15      | 31    | AREA_B     | DOT                       | .
+16      | 8     | AREA_A     | PROGRAM-ID                | PROGRAM-ID
+16      | 18    | AREA_B     | DOT                       | .
+16      | 20    | AREA_B     | VALID_ID                  | PROG0001
+16      | 28    | AREA_B     | DOT                       | .
+19      | 8     | AREA_A     | AUTHOR                    | AUTHOR
+19      | 14    | AREA_B     | DOT                       | .
+19      | 16    | AREA_B     | COMMENT_ENTRY             | Enio Basso.
+20      | 8     | AREA_A     | INSTALLATION              | INSTALLATION
+20      | 20    | AREA_B     | DOT                       | .
+20      | 22    | AREA_B     | COMMENT_ENTRY             | ebasso(dot)net.
+21      | 8     | AREA_A     | DATE-WRITTEN              | DATE-WRITTEN
+21      | 20    | AREA_B     | DOT                       | .
+21      | 22    | AREA_B     | COMMENT_ENTRY             | 2018-02-24.
+22      | 8     | AREA_A     | DATE-COMPILED             | DATE-COMPILED
+22      | 21    | AREA_B     | DOT                       | .
+22      | 23    | AREA_B     | COMMENT_ENTRY             | 2018-02-24.
+23      | 8     | AREA_A     | SECURITY                  | SECURITY
+23      | 16    | AREA_B     | DOT                       | .
+23      | 18    | AREA_B     | COMMENT_ENTRY             | O programa usa criptografia XPTO.
+24      | 8     | AREA_A     | REMARKS                   | REMARKS
+24      | 15    | AREA_B     | DOT                       | .
+24      | 17    | AREA_B     | COMMENT_ENTRY             | O programa recebe um valor e imprime na tela.
+27      | 8     | AREA_A     | ENVIRONMENT               | ENVIRONMENT
+27      | 20    | AREA_B     | DIVISION                  | DIVISION
+27      | 28    | AREA_B     | DOT                       | .
+29      | 8     | AREA_A     | CONFIGURATION             | CONFIGURATION
+29      | 22    | AREA_B     | SECTION                   | SECTION
+29      | 29    | AREA_B     | DOT                       | .
+37      | 8     | AREA_A     | INPUT-OUTPUT              | INPUT-OUTPUT
+37      | 21    | AREA_B     | SECTION                   | SECTION
+37      | 28    | AREA_B     | DOT                       | .
+46      | 8     | AREA_A     | DATA                      | DATA
+46      | 13    | AREA_B     | DIVISION                  | DIVISION
+46      | 21    | AREA_B     | DOT                       | .
+53      | 8     | AREA_A     | PROCEDURE                 | PROCEDURE
+53      | 18    | AREA_B     | DIVISION                  | DIVISION
+53      | 26    | AREA_B     | DOT                       | .
+54      | 8     | AREA_A     | ERROR_INVALID_ID          | MAIN-PROCEDURE-
+54      | 23    | AREA_B     | DOT                       | .
+55      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+55      | 21    | AREA_B     | ERROR_UNCLOSED_STRING     | Hello world                                        
+56      | 13    | AREA_B     | DISPLAY                   | DISPLAY
+56      | 21    | AREA_B     | ALPHANUMERIC_LITERAL      | Enio Basso - 2
+57      | 13    | AREA_B     | STOP                      | STOP
+57      | 18    | AREA_B     | RUN                       | RUN
+57      | 21    | AREA_B     | DOT                       | .
+58      | 8     | AREA_A     | VALID_ID                  | END
+58      | 12    | AREA_B     | VALID_ID                  | PROGRAM
+58      | 20    | AREA_B     | VALID_ID                  | PROG0001
+58      | 28    | AREA_B     | DOT                       | .
+
+SEV   | LINHA   | COL   | MENSAGEM
+----------------------------------------------------------------------
+E     | 54      | 8     | Palavra inválida: 'MAIN-PROCEDURE-'
+E     | 55      | 21    | Literal alfanumérico não fechado
