@@ -2132,34 +2132,122 @@ def generate_llvm_ir(program: ProgramNode) -> str:
     return generator.generate_module()
 
 
-def try_compile_llvm_ir(ll_path: str, bin_path: str) -> tuple[bool, str]:
-    """Tenta compilar o arquivo .ll para binário nativo caso clang ou llc+gcc estejam instalados."""
+def compile_with_llvm_toolchain(
+    ll_path: str,
+    output_path: str,
+    opt_level: str = "-O0",
+    output_mode: str = "executable",
+    debug_info: bool = False,
+    extra_flags: list[str] | None = None,
+    verbose: bool = False,
+) -> tuple[bool, str, list[str]]:
+    """
+    Aciona a infraestrutura LLVM (clang, opt, llc) sobre o arquivo .ll gerado,
+    repassando flags de otimização (-O0, -O1, -O2, -O3, -Os, -Oz) e modo de saída:
+      - 'llvm-ir': mantém/otimiza o .ll (via clang -S -emit-llvm ou opt -S)
+      - 'bitcode': gera bitcode LLVM .bc (via clang -c -emit-llvm)
+      - 'assembly': gera assembly nativo .s (via clang -S ou llc)
+      - 'object': gera código objeto .o não linkado (via clang -c ou llc -filetype=obj)
+      - 'executable': gera binário executável nativo linkado com libm (-lm)
+    Retorna (sucesso, mensagem, comandos_executados).
+    """
+    extra = list(extra_flags) if extra_flags else []
+    executed_cmds: list[str] = []
+
+    # Se o alvo é apenas LLVM IR sem otimização adicional no mesmo arquivo, já está pronto
+    if output_mode == "llvm-ir" and (opt_level == "-O0" or os.path.abspath(ll_path) == os.path.abspath(output_path)):
+        if os.path.abspath(ll_path) != os.path.abspath(output_path):
+            shutil.copyfile(ll_path, output_path)
+        if opt_level != "-O0":
+            opt_bin = shutil.which("opt")
+            clang_bin = shutil.which("clang")
+            if opt_bin:
+                cmd = [opt_bin, opt_level, "-S", ll_path, "-o", output_path] + extra
+                executed_cmds.append(" ".join(cmd))
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode != 0:
+                    return False, f"Erro no otimizador LLVM (opt):\n{proc.stderr}", executed_cmds
+                return True, f"LLVM IR otimizado ({opt_level}) gerado em: '{output_path}'", executed_cmds
+            if clang_bin:
+                tmp_ll = output_path + ".opt.tmp.ll"
+                cmd = [clang_bin, "-S", "-emit-llvm", opt_level, ll_path, "-o", tmp_ll] + extra
+                executed_cmds.append(" ".join(cmd))
+                proc = subprocess.run(cmd, capture_output=True, text=True)
+                if proc.returncode == 0 and os.path.exists(tmp_ll):
+                    shutil.move(tmp_ll, output_path)
+                    return True, f"LLVM IR otimizado ({opt_level}) gerado em: '{output_path}'", executed_cmds
+        return True, f"Representação Intermediária LLVM gerada em: '{output_path}'", executed_cmds
+
     clang_bin = shutil.which("clang")
     if clang_bin:
-        proc = subprocess.run(
-            [clang_bin, ll_path, "-lm", "-o", bin_path],
-            capture_output=True,
-            text=True,
-        )
+        cmd: list[str] = [clang_bin, opt_level]
+        if debug_info:
+            cmd.append("-g")
+        if output_mode == "llvm-ir":
+            cmd.extend(["-S", "-emit-llvm", ll_path, "-o", output_path])
+        elif output_mode == "bitcode":
+            cmd.extend(["-c", "-emit-llvm", ll_path, "-o", output_path])
+        elif output_mode == "assembly":
+            cmd.extend(["-S", ll_path, "-o", output_path])
+        elif output_mode == "object":
+            cmd.extend(["-c", ll_path, "-o", output_path])
+        else:
+            cmd.extend([ll_path, "-lm", "-o", output_path])
+        cmd.extend(extra)
+
+        executed_cmds.append(" ".join(cmd))
+        proc = subprocess.run(cmd, capture_output=True, text=True)
         if proc.returncode == 0:
-            return True, f"Executável nativo compilado via clang: '{bin_path}'"
-        return False, f"Erro ao compilar com clang:\n{proc.stderr}"
+            return True, f"Saída ({output_mode}, {opt_level}) gerada via clang em: '{output_path}'", executed_cmds
+        return False, f"Erro ao compilar com clang:\n{proc.stderr}", executed_cmds
 
     llc_bin = shutil.which("llc")
     gcc_bin = shutil.which("gcc")
-    if llc_bin and gcc_bin:
-        obj_path = ll_path + ".o"
-        p1 = subprocess.run([llc_bin, "-filetype=obj", ll_path, "-o", obj_path], capture_output=True, text=True)
-        if p1.returncode != 0:
-            return False, f"Erro ao montar com llc:\n{p1.stderr}"
-        p2 = subprocess.run([gcc_bin, obj_path, "-lm", "-no-pie", "-o", bin_path], capture_output=True, text=True)
-        if os.path.exists(obj_path):
-            os.remove(obj_path)
-        if p2.returncode == 0:
-            return True, f"Executável nativo compilado via llc + gcc: '{bin_path}'"
-        return False, f"Erro ao linkeditar com gcc:\n{p2.stderr}"
+    if llc_bin:
+        llc_opt = opt_level if opt_level in ("-O0", "-O1", "-O2", "-O3") else "-O2"
+        if output_mode == "assembly":
+            cmd = [llc_bin, llc_opt, "-filetype=asm", ll_path, "-o", output_path] + extra
+            executed_cmds.append(" ".join(cmd))
+            p1 = subprocess.run(cmd, capture_output=True, text=True)
+            if p1.returncode == 0:
+                return True, f"Assembly nativo ({llc_opt}) gerado via llc em: '{output_path}'", executed_cmds
+            return False, f"Erro ao gerar assembly com llc:\n{p1.stderr}", executed_cmds
 
-    return False, "Binários 'clang' ou 'llc' não encontrados no PATH; apenas o arquivo .ll foi gerado."
+        if output_mode == "object":
+            cmd = [llc_bin, llc_opt, "-filetype=obj", ll_path, "-o", output_path] + extra
+            executed_cmds.append(" ".join(cmd))
+            p1 = subprocess.run(cmd, capture_output=True, text=True)
+            if p1.returncode == 0:
+                return True, f"Código objeto ({llc_opt}) gerado via llc em: '{output_path}'", executed_cmds
+            return False, f"Erro ao montar objeto com llc:\n{p1.stderr}", executed_cmds
+
+        if output_mode == "executable" and gcc_bin:
+            obj_path = ll_path + ".o"
+            cmd1 = [llc_bin, llc_opt, "-filetype=obj", ll_path, "-o", obj_path] + extra
+            executed_cmds.append(" ".join(cmd1))
+            p1 = subprocess.run(cmd1, capture_output=True, text=True)
+            if p1.returncode != 0:
+                return False, f"Erro ao montar com llc:\n{p1.stderr}", executed_cmds
+            cmd2 = [gcc_bin, obj_path, "-lm", "-no-pie", "-o", output_path]
+            executed_cmds.append(" ".join(cmd2))
+            p2 = subprocess.run(cmd2, capture_output=True, text=True)
+            if os.path.exists(obj_path):
+                os.remove(obj_path)
+            if p2.returncode == 0:
+                return True, f"Executável nativo compilado via llc + gcc: '{output_path}'", executed_cmds
+            return False, f"Erro ao linkeditar com gcc:\n{p2.stderr}", executed_cmds
+
+    return (
+        False,
+        "Ferramentas LLVM ('clang' ou 'llc') não encontradas no PATH para concluir esta etapa.",
+        executed_cmds,
+    )
+
+
+def try_compile_llvm_ir(ll_path: str, bin_path: str) -> tuple[bool, str]:
+    """Tenta compilar o arquivo .ll para binário nativo caso clang ou llc+gcc estejam instalados."""
+    ok, msg, _ = compile_with_llvm_toolchain(ll_path, bin_path, opt_level="-O0", output_mode="executable")
+    return ok, msg
 
 
 if __name__ == "__main__":

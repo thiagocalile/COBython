@@ -92,6 +92,19 @@ def classify_pic(pic: str) -> str:
     return "ALPHANUMERIC"
 
 
+def compute_pic_byte_size(pic: str | None) -> int:
+    """Calcula o tamanho físico em bytes de uma máscara PICTURE."""
+    if not pic:
+        return 0
+    expanded = re.sub(
+        r"([9XASVZPB0/,.\-+*$])\(([0-9]+)\)",
+        lambda m: m.group(1) * int(m.group(2)),
+        pic.upper(),
+    )
+    physical = [c for c in expanded if c not in ("V", "S", "P")]
+    return max(1, len(physical))
+
+
 def classify_data_item(item: DataItemNode) -> str:
     """Determina a categoria semântica de um DataItemNode."""
     if item.level == 88:
@@ -118,6 +131,9 @@ class SemanticAnalyzer:
         self.symbols_by_name: dict[str, list[SymbolEntry]] = {}
         # Controle de unicidade no mesmo escopo: (scope_parent, name) -> SymbolEntry
         self.scoped_symbols: dict[tuple[str, str], SymbolEntry] = {}
+        # Rastreamento de símbolos da WORKING-STORAGE e referências para diagnósticos nível I (Seção 6)
+        self.working_storage_entries: list[SymbolEntry] = []
+        self.referenced_names: set[str] = set()
 
         # Tabelas de arquivos e registros (Regra 4)
         self.select_files: dict[str, SelectNode] = {}
@@ -140,6 +156,9 @@ class SemanticAnalyzer:
 
         # 2. Validar instruções, expressões e comandos da PROCEDURE DIVISION (Regras 1, 2, 3 e 4)
         self._analyze_procedure_division()
+
+        # 3. Emitir diagnósticos informativos (nível I da Seção 6) para variáveis não utilizadas
+        self._check_unused_variables()
 
         is_valid = not any(err.severity in ("E", "S") for err in self.errors)
         return is_valid, self.errors
@@ -189,9 +208,11 @@ class SemanticAnalyzer:
 
         # 2. WORKING-STORAGE SECTION
         for item in data_div.working_storage:
-            self._register_data_item(item, ancestors=())
+            self._register_data_item(item, ancestors=(), is_working_storage=True)
 
-    def _register_data_item(self, item: DataItemNode, ancestors: tuple[str, ...]) -> None:
+    def _register_data_item(
+        self, item: DataItemNode, ancestors: tuple[str, ...], is_working_storage: bool = False
+    ) -> None:
         scope_parent = ancestors[-1] if ancestors else "<GLOBAL>"
         category = classify_data_item(item)
 
@@ -224,6 +245,8 @@ class SemanticAnalyzer:
                 )
             else:
                 self.scoped_symbols[scope_key] = entry
+                if is_working_storage:
+                    self.working_storage_entries.append(entry)
 
             self.symbols_by_name.setdefault(item.name, []).append(entry)
 
@@ -261,7 +284,7 @@ class SemanticAnalyzer:
         # Registra recursivamente os subcampos filhos
         next_ancestors = ancestors + (item.name,)
         for child in item.children:
-            self._register_data_item(child, next_ancestors)
+            self._register_data_item(child, next_ancestors, is_working_storage=is_working_storage)
 
     def _check_initial_value_compatibility(self, entry: SymbolEntry, val: str) -> None:
         val_upper = val.upper()
@@ -311,10 +334,30 @@ class SemanticAnalyzer:
     def _validate_select_variable_refs(self) -> None:
         # Valida se RECORD KEY, ALTERNATE RECORD KEY e FILE STATUS referenciam variáveis existentes
         for sel in self.select_files.values():
+            if sel.assign_to in self.symbols_by_name:
+                self._mark_symbol_referenced(self.symbols_by_name[sel.assign_to][0])
             for clause in sel.clauses:
                 if clause.clause_type in ("RECORD_KEY", "ALTERNATE_RECORD_KEY", "FILE_STATUS"):
                     ref = IdentifierRef(line=sel.line, col=sel.col, name=clause.value)
                     self.resolve_identifier(ref)
+
+    def _mark_symbol_referenced(self, entry: SymbolEntry) -> None:
+        self.referenced_names.add(entry.name)
+        for anc in entry.ancestors:
+            self.referenced_names.add(anc)
+
+    def _check_unused_variables(self) -> None:
+        for entry in self.working_storage_entries:
+            if entry.name in self.referenced_names:
+                continue
+            if any(anc in self.referenced_names for anc in entry.ancestors):
+                continue
+            self.add_error(
+                entry.line,
+                entry.col,
+                f"Sugestão de otimização: variável '{entry.name}' declarada na WORKING-STORAGE SECTION não é referenciada",
+                severity="I",
+            )
 
     def _collect_procedure_targets(self) -> None:
         proc = self.program.procedure_division
@@ -391,6 +434,7 @@ class SemanticAnalyzer:
                     f"e exige qualificação por hierarquia (OF)",
                 )
                 return None
+            self._mark_symbol_referenced(candidates[0])
             return candidates[0]
 
         # Com qualificação por OF (ex: WRK-TOTAL OF WRK-TOTAIS)
@@ -415,6 +459,7 @@ class SemanticAnalyzer:
             )
             return None
 
+        self._mark_symbol_referenced(matched[0])
         return matched[0]
 
     @staticmethod
@@ -483,6 +528,13 @@ class SemanticAnalyzer:
         elif isinstance(stmt, AcceptStmt):
             self.resolve_identifier(stmt.target)
         elif isinstance(stmt, IfStmt):
+            if not stmt.has_end_if:
+                self.add_error(
+                    stmt.line,
+                    stmt.col,
+                    "Sugestão de estilo: considere encerrar o bloco condicional IF com 'END-IF' explícito",
+                    severity="I",
+                )
             self._check_condition(stmt.condition)
             for s in stmt.then_body:
                 self._analyze_statement(s)
@@ -609,6 +661,17 @@ class SemanticAnalyzer:
                         f"'{source_entry.name}' para variável puramente alfabética "
                         f"'{target_entry.name}' (PIC {target_entry.pic})",
                     )
+                elif source_entry.pic is not None and target_entry.pic is not None:
+                    src_sz = compute_pic_byte_size(source_entry.pic)
+                    dst_sz = compute_pic_byte_size(target_entry.pic)
+                    if src_sz > dst_sz:
+                        self.add_error(
+                            stmt.line,
+                            stmt.col,
+                            f"Potencial truncamento em MOVE: variável de origem '{source_entry.name}' "
+                            f"({src_sz} bytes) é maior que o destino '{target_entry.name}' ({dst_sz} bytes)",
+                            severity="W",
+                        )
 
             # 2. Origem é um literal ou constante figurativa
             elif isinstance(stmt.source, LiteralNode):
@@ -676,6 +739,12 @@ class SemanticAnalyzer:
 
     def _check_goto_stmt(self, stmt: GoToStmt) -> None:
         if stmt.target not in ("<DESCONHECIDO>", "<ANONIMO>"):
+            self.add_error(
+                stmt.line,
+                stmt.col,
+                f"Uso de 'GO TO {stmt.target}' pode gerar fluxo de controle ambíguo; prefira estruturar com PERFORM",
+                severity="W",
+            )
             if stmt.target not in self.procedures:
                 self.add_error(
                     stmt.line,
