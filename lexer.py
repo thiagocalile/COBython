@@ -63,7 +63,7 @@ COMMENT_ENTRY_PARAGRAPHS = {
 WORD_TYPES = {"VALID_ID", "NUMBER", "ERROR_INVALID_ID", "ERROR_ID_TOO_BIG"}
 
 # Caracteres que encerram uma palavra fora de um literal
-WORD_DELIMITERS = ("'", '"', ",", ";", "(", ")")
+WORD_DELIMITERS = ("'", '"', ",", ";", "(", ")", ":")
 
 ERROR_MESSAGES = {
     "ERROR_ID_TOO_BIG": "Identificador excede o limite de 30 caracteres",
@@ -231,8 +231,8 @@ def make_token_stream(source_file: list[str], debugging_mode: bool = False) -> t
                 i += 1
                 continue
 
-            # Pontuação isolada (vírgula, parênteses, ponto e vírgula)
-            if char in (",", ";", "(", ")"):
+            # Pontuação isolada (vírgula, parênteses, ponto e vírgula, dois-pontos)
+            if char in (",", ";", "(", ")", ":"):
                 token_type = match_token(char)
                 token_stream.append(Token(line_number, col_actual, area, token_type, char))
                 i += 1
@@ -410,6 +410,8 @@ def match_punctuation(substring: str) -> str:
             return "LEFT_PAREN"
         case ")":
             return "RIGHT_PAREN"
+        case ":":
+            return "COLON"
         case _:
             return ""
 

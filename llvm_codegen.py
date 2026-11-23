@@ -22,19 +22,27 @@ from parser import (
     AcceptStmt,
     AddStmt,
     BinaryExprNode,
+    CallStmt,
+    ClassConditionNode,
     CloseStmt,
     ComputeStmt,
     ConditionNode,
+    ContinueStmt,
     DataItemNode,
     DisplayStmt,
     DivideStmt,
+    EvaluateRangeNode,
     EvaluateStmt,
+    ExitStmt,
     ExprNode,
     FunctionCallNode,
+    GobackStmt,
     GoToStmt,
     IdentifierRef,
     IfStmt,
+    InitializeStmt,
     InspectStmt,
+    LengthOfNode,
     LiteralNode,
     LogicalConditionNode,
     MoveStmt,
@@ -257,6 +265,35 @@ class LLVMIRGenerator:
         for item in data_div.working_storage:
             self._build_root_item(item)
 
+        for item in data_div.linkage_section:
+            self._build_root_item(item)
+
+        # Registrador especial implícito RETURN-CODE (se não declarado explicitamente)
+        if "RETURN-CODE" not in self.fields_by_name:
+            rc_sym = "@var_SPECIAL_RETURN_CODE"
+            rc_buf = RootBufferInfo(
+                global_name=rc_sym,
+                size=4,
+                initial_bytes=bytearray(b"0000"),
+            )
+            self.root_buffers.append(rc_buf)
+            self.fields_by_name["RETURN-CODE"] = [
+                FieldLayout(
+                    name="RETURN-CODE",
+                    ancestors=(),
+                    root_global=rc_sym,
+                    base_offset=0,
+                    elem_size=4,
+                    total_size=4,
+                    category="NUMERIC",
+                    pic="S9(4)",
+                    scale=0,
+                    is_signed=True,
+                    is_edited=False,
+                    dimensions=[],
+                )
+            ]
+
         # Verifica se algum SELECT usa nome de variável em ASSIGN TO
         for f_info in self.files.values():
             if f_info.assign_target in self.fields_by_name:
@@ -475,31 +512,50 @@ class LLVMIRGenerator:
             self.emit(
                 f"{ptr_reg} = getelementptr inbounds i8, ptr {layout.root_global}, i64 {layout.base_offset}"
             )
-            return ptr_reg, layout.elem_size, layout
+            base_ptr, base_len = ptr_reg, layout.elem_size
+        else:
+            # Calcula deslocamento dinâmico para subscritos (i_k - 1) * stride_k
+            offset_reg = self.new_reg("ofs")
+            self.emit(f"{offset_reg} = add i64 0, {layout.base_offset}")
 
-        # Calcula deslocamento dinâmico para subscritos (i_k - 1) * stride_k
-        offset_reg = self.new_reg("ofs")
-        self.emit(f"{offset_reg} = add i64 0, {layout.base_offset}")
+            num_subs = min(len(ref.subscripts), len(layout.dimensions))
+            for k in range(num_subs):
+                _, stride = layout.dimensions[k]
+                sub_val_dbl = self.emit_numeric_expr(ref.subscripts[k])
+                sub_idx_i64 = self.new_reg("idx")
+                self.emit(f"{sub_idx_i64} = fptosi double {sub_val_dbl} to i64")
+                zero_based = self.new_reg("zb")
+                self.emit(f"{zero_based} = sub i64 {sub_idx_i64}, 1")
+                scaled_ofs = self.new_reg("sofs")
+                self.emit(f"{scaled_ofs} = mul i64 {zero_based}, {stride}")
+                new_offset_reg = self.new_reg("ofs")
+                self.emit(f"{new_offset_reg} = add i64 {offset_reg}, {scaled_ofs}")
+                offset_reg = new_offset_reg
 
-        num_subs = min(len(ref.subscripts), len(layout.dimensions))
-        for k in range(num_subs):
-            _, stride = layout.dimensions[k]
-            sub_val_dbl = self.emit_numeric_expr(ref.subscripts[k])
-            sub_idx_i64 = self.new_reg("idx")
-            self.emit(f"{sub_idx_i64} = fptosi double {sub_val_dbl} to i64")
-            zero_based = self.new_reg("zb")
-            self.emit(f"{zero_based} = sub i64 {sub_idx_i64}, 1")
-            scaled_ofs = self.new_reg("sofs")
-            self.emit(f"{scaled_ofs} = mul i64 {zero_based}, {stride}")
-            new_offset_reg = self.new_reg("ofs")
-            self.emit(f"{new_offset_reg} = add i64 {offset_reg}, {scaled_ofs}")
-            offset_reg = new_offset_reg
+            ptr_reg = self.new_reg("ptr")
+            self.emit(
+                f"{ptr_reg} = getelementptr inbounds i8, ptr {layout.root_global}, i64 {offset_reg}"
+            )
+            base_ptr, base_len = ptr_reg, layout.elem_size
 
-        ptr_reg = self.new_reg("ptr")
-        self.emit(
-            f"{ptr_reg} = getelementptr inbounds i8, ptr {layout.root_global}, i64 {offset_reg}"
-        )
-        return ptr_reg, layout.elem_size, layout
+        # Modificação de referência: VAR(inicio:[tamanho]) (1-indexado)
+        if ref.ref_mod_start is not None:
+            start_dbl = self.emit_numeric_expr(ref.ref_mod_start)
+            start_i64 = self.new_reg("rms")
+            self.emit(f"{start_i64} = fptosi double {start_dbl} to i64")
+            start_zb = self.new_reg("rmz")
+            self.emit(f"{start_zb} = sub i64 {start_i64}, 1")
+            rm_ptr = self.new_reg("rmptr")
+            self.emit(f"{rm_ptr} = getelementptr inbounds i8, ptr {base_ptr}, i64 {start_zb}")
+            slice_len = base_len
+            if isinstance(ref.ref_mod_length, LiteralNode) and ref.ref_mod_length.literal_type == "NUMBER":
+                try:
+                    slice_len = max(1, int(float(ref.ref_mod_length.value)))
+                except ValueError:
+                    slice_len = base_len
+            return rm_ptr, slice_len, layout
+
+        return base_ptr, base_len, layout
 
     # ==========================================================================
     # 3. AVALIAÇÃO DE EXPRESSÕES E CONDIÇÕES EM LLVM IR
@@ -526,6 +582,13 @@ class LLVMIRGenerator:
                     val = 0.0
             reg = self.new_reg("num")
             self.emit(f"{reg} = fadd double 0.0, {val:.8e}")
+            return reg
+
+        if isinstance(expr, LengthOfNode):
+            layout = self.resolve_field(expr.target)
+            sz = float(layout.elem_size if layout else 0)
+            reg = self.new_reg("lenof")
+            self.emit(f"{reg} = fadd double 0.0, {sz:.8e}")
             return reg
 
         if isinstance(expr, IdentifierRef):
@@ -619,6 +682,13 @@ class LLVMIRGenerator:
             ptr_reg, length, _ = self.emit_field_address_and_length(expr)
             return ptr_reg, length
 
+        if isinstance(expr, FunctionCallNode) and expr.function_name == "REVERSE" and expr.arguments:
+            src_ptr, src_len = self.emit_string_slice(expr.arguments[0])
+            rev_buf = self.new_reg("revbuf")
+            self.emit(f"{rev_buf} = alloca [{max(1, src_len)} x i8]")
+            self.emit(f"call void @__cobol_reverse_copy(ptr {rev_buf}, ptr {src_ptr}, i64 {src_len})")
+            return rev_buf, src_len
+
         sym, length = self.intern_string(" ", null_terminate=False)
         return sym, length
 
@@ -652,6 +722,17 @@ class LLVMIRGenerator:
             val_reg = self.emit_numeric_expr(cond.operand)
             r = self.new_reg("scond")
             self.emit(f"{r} = fcmp one double {val_reg}, 0.0")
+            return r
+
+        if isinstance(cond, ClassConditionNode):
+            ptr_reg, length = self.emit_string_slice(cond.operand)
+            helper = "@__cobol_is_numeric" if cond.class_name == "NUMERIC" else "@__cobol_is_alpha"
+            r = self.new_reg("clsc")
+            self.emit(f"{r} = call i1 {helper}(ptr {ptr_reg}, i64 {length})")
+            if cond.negated:
+                nr = self.new_reg("nclsc")
+                self.emit(f"{nr} = xor i1 {r}, true")
+                return nr
             return r
 
         if isinstance(cond, NotConditionNode):
@@ -747,6 +828,21 @@ class LLVMIRGenerator:
         elif isinstance(stmt, StopRunStmt):
             self.emit("call void @exit(i32 0)")
             self.emit_terminator("unreachable")
+        elif isinstance(stmt, GobackStmt):
+            self.emit("call void @exit(i32 0)")
+            self.emit_terminator("unreachable")
+        elif isinstance(stmt, ExitStmt):
+            if stmt.mode == "PROGRAM":
+                self.emit("call void @exit(i32 0)")
+                self.emit_terminator("unreachable")
+            elif stmt.mode in ("PARAGRAPH", "SECTION"):
+                self.emit_terminator("ret void")
+        elif isinstance(stmt, ContinueStmt):
+            pass
+        elif isinstance(stmt, InitializeStmt):
+            self._emit_initialize(stmt)
+        elif isinstance(stmt, CallStmt):
+            self._emit_call(stmt)
         elif isinstance(stmt, GoToStmt):
             fn = self.paragraph_functions.get(stmt.target)
             if fn:
@@ -901,21 +997,57 @@ class LLVMIRGenerator:
                     )
 
     def _emit_perform(self, stmt: PerformStmt) -> None:
-        targets_to_call = self._resolve_perform_range(stmt.target, stmt.thru)
+        targets_to_call = (
+            self._resolve_perform_range(stmt.target, stmt.thru) if stmt.target is not None else []
+        )
 
-        if stmt.until is not None:
-            cond_lbl = self.new_label("perform.cond")
-            body_lbl = self.new_label("perform.body")
-            end_lbl = self.new_label("perform.end")
+        def emit_body() -> None:
+            if stmt.inline_body:
+                for s in stmt.inline_body:
+                    self.emit_statement(s)
+            else:
+                for fn in targets_to_call:
+                    self.emit(f"call void {fn}()")
 
+        if stmt.varying_var is not None:
+            # Inicializa variável de controle: MOVE from TO var
+            init_val = self.emit_numeric_expr(stmt.varying_from)
+            self.emit_store_numeric(init_val, stmt.varying_var)
+
+            cond_lbl = self.new_label("perform.var.cond")
+            body_lbl = self.new_label("perform.var.body")
+            end_lbl = self.new_label("perform.var.end")
+
+            self.emit_terminator(f"br label %{cond_lbl}")
             self.emit_label(cond_lbl)
             c_reg = self.emit_condition(stmt.until)
             self.emit_terminator(f"br i1 {c_reg}, label %{end_lbl}, label %{body_lbl}")
 
             self.emit_label(body_lbl)
-            for fn in targets_to_call:
-                self.emit(f"call void {fn}()")
+            emit_body()
+            if not self.block_terminated:
+                cur_v = self.emit_numeric_expr(stmt.varying_var)
+                step_v = self.emit_numeric_expr(stmt.varying_by)
+                nxt_v = self.new_reg("var_nxt")
+                self.emit(f"{nxt_v} = fadd double {cur_v}, {step_v}")
+                self.emit_store_numeric(nxt_v, stmt.varying_var)
+                self.emit_terminator(f"br label %{cond_lbl}")
+
+            self.emit_label(end_lbl)
+        elif stmt.until is not None:
+            cond_lbl = self.new_label("perform.cond")
+            body_lbl = self.new_label("perform.body")
+            end_lbl = self.new_label("perform.end")
+
             self.emit_terminator(f"br label %{cond_lbl}")
+            self.emit_label(cond_lbl)
+            c_reg = self.emit_condition(stmt.until)
+            self.emit_terminator(f"br i1 {c_reg}, label %{end_lbl}, label %{body_lbl}")
+
+            self.emit_label(body_lbl)
+            emit_body()
+            if not self.block_terminated:
+                self.emit_terminator(f"br label %{cond_lbl}")
 
             self.emit_label(end_lbl)
         elif stmt.times is not None:
@@ -930,6 +1062,7 @@ class LLVMIRGenerator:
             body_lbl = self.new_label("perform.times.body")
             end_lbl = self.new_label("perform.times.end")
 
+            self.emit_terminator(f"br label %{cond_lbl}")
             self.emit_label(cond_lbl)
             cur_v = self.new_reg("tc")
             self.emit(f"{cur_v} = load i64, ptr {cnt_ptr}")
@@ -938,17 +1071,86 @@ class LLVMIRGenerator:
             self.emit_terminator(f"br i1 {cmp_r}, label %{body_lbl}, label %{end_lbl}")
 
             self.emit_label(body_lbl)
-            for fn in targets_to_call:
-                self.emit(f"call void {fn}()")
-            nxt_v = self.new_reg("tnxt")
-            self.emit(f"{nxt_v} = sub i64 {cur_v}, 1")
-            self.emit(f"store i64 {nxt_v}, ptr {cnt_ptr}")
-            self.emit_terminator(f"br label %{cond_lbl}")
+            emit_body()
+            if not self.block_terminated:
+                nxt_v = self.new_reg("tnxt")
+                self.emit(f"{nxt_v} = sub i64 {cur_v}, 1")
+                self.emit(f"store i64 {nxt_v}, ptr {cnt_ptr}")
+                self.emit_terminator(f"br label %{cond_lbl}")
 
             self.emit_label(end_lbl)
         else:
-            for fn in targets_to_call:
-                self.emit(f"call void {fn}()")
+            emit_body()
+
+    def _emit_initialize(self, stmt: InitializeStmt) -> None:
+        rep_map = {cat.upper(): expr for cat, expr in stmt.replacing}
+        for target_ref in stmt.targets:
+            layout = self.resolve_field(target_ref)
+            if layout is None:
+                continue
+            if layout.category == "GROUP":
+                # Inicializa cada campo elementar subordinado ao grupo
+                leaves = [
+                    fl
+                    for layouts in self.fields_by_name.values()
+                    for fl in layouts
+                    if fl.root_global == layout.root_global
+                    and fl.category != "GROUP"
+                    and layout.name in fl.ancestors
+                ]
+                for leaf in leaves:
+                    ptr_reg = self.new_reg("initp")
+                    self.emit(
+                        f"{ptr_reg} = getelementptr inbounds i8, ptr {leaf.root_global}, i64 {leaf.base_offset}"
+                    )
+                    if leaf.category == "NUMERIC":
+                        if "NUMERIC" in rep_map:
+                            v = self.emit_numeric_expr(rep_map["NUMERIC"])
+                            is_ed = 1 if leaf.is_edited else 0
+                            self.emit(
+                                f"call void @__cobol_write_num(double {v}, ptr {ptr_reg}, i64 {leaf.elem_size}, i64 {leaf.scale}, i32 {is_ed})"
+                            )
+                        else:
+                            self.emit(
+                                f"call void @llvm.memset.p0.i64(ptr {ptr_reg}, i8 48, i64 {leaf.total_size}, i1 false)"
+                            )
+                    else:
+                        if "ALPHANUMERIC" in rep_map:
+                            s_ptr, s_len = self.emit_string_slice(rep_map["ALPHANUMERIC"])
+                            self.emit(
+                                f"call void @__cobol_move_alpha(ptr {ptr_reg}, i64 {leaf.elem_size}, ptr {s_ptr}, i64 {s_len})"
+                            )
+                        else:
+                            self.emit(
+                                f"call void @llvm.memset.p0.i64(ptr {ptr_reg}, i8 32, i64 {leaf.total_size}, i1 false)"
+                            )
+            else:
+                ptr_reg, length, _ = self.emit_field_address_and_length(target_ref)
+                if layout.category == "NUMERIC":
+                    if "NUMERIC" in rep_map:
+                        v = self.emit_numeric_expr(rep_map["NUMERIC"])
+                        self.emit_store_numeric(v, target_ref)
+                    else:
+                        self.emit(
+                            f"call void @llvm.memset.p0.i64(ptr {ptr_reg}, i8 48, i64 {length}, i1 false)"
+                        )
+                else:
+                    if "ALPHANUMERIC" in rep_map:
+                        s_ptr, s_len = self.emit_string_slice(rep_map["ALPHANUMERIC"])
+                        self.emit(
+                            f"call void @__cobol_move_alpha(ptr {ptr_reg}, i64 {length}, ptr {s_ptr}, i64 {s_len})"
+                        )
+                    else:
+                        self.emit(
+                            f"call void @llvm.memset.p0.i64(ptr {ptr_reg}, i8 32, i64 {length}, i1 false)"
+                        )
+
+    def _emit_call(self, stmt: CallStmt) -> None:
+        # Subprogramas externos: zera RETURN-CODE em compilação standalone
+        rc_ref = IdentifierRef(line=stmt.line, col=stmt.col, name="RETURN-CODE")
+        z_reg = self.new_reg("call_rc")
+        self.emit(f"{z_reg} = fadd double 0.0, 0.0")
+        self.emit_store_numeric(z_reg, rc_ref)
 
     def _resolve_perform_range(self, start_name: str, thru_name: str | None) -> list[str]:
         if thru_name is None or start_name not in self.paragraph_Order or thru_name not in self.paragraph_Order:
@@ -1126,8 +1328,12 @@ class LLVMIRGenerator:
 
     def _emit_evaluate(self, stmt: EvaluateStmt) -> None:
         end_lbl = self.new_label("eval.end")
-        subj_is_alpha = self.is_alphanumeric_expr(stmt.subject)
-        if subj_is_alpha:
+        is_bool_subj = isinstance(stmt.subject, LiteralNode) and stmt.subject.literal_type == "BOOLEAN"
+        bool_expect_false = is_bool_subj and stmt.subject.value.upper() == "FALSE"
+        subj_is_alpha = (not is_bool_subj) and self.is_alphanumeric_expr(stmt.subject)
+        if is_bool_subj:
+            subj_ptr, subj_len, subj_num = "", 0, ""
+        elif subj_is_alpha:
             subj_ptr, subj_len = self.emit_string_slice(stmt.subject)
             subj_num = ""
         else:
@@ -1138,8 +1344,39 @@ class LLVMIRGenerator:
             body_lbl = self.new_label("eval.when.body")
             next_lbl = self.new_label("eval.when.next")
 
-            if isinstance(br.condition, str) and br.condition == "OTHER":
+            if isinstance(br.condition, str) and br.condition in ("OTHER", "ANY"):
                 self.emit_terminator(f"br label %{body_lbl}")
+            elif isinstance(br.condition, ConditionNode):
+                c_reg = self.emit_condition(br.condition)
+                if bool_expect_false:
+                    inv = self.new_reg("efalse")
+                    self.emit(f"{inv} = xor i1 {c_reg}, true")
+                    c_reg = inv
+                self.emit_terminator(f"br i1 {c_reg}, label %{body_lbl}, label %{next_lbl}")
+            elif isinstance(br.condition, EvaluateRangeNode):
+                if subj_is_alpha:
+                    lo_p, lo_l = self.emit_string_slice(br.condition.start)
+                    hi_p, hi_l = self.emit_string_slice(br.condition.end)
+                    c1 = self.new_reg("erlo")
+                    c2 = self.new_reg("erhi")
+                    self.emit(f"{c1} = call i32 @__cobol_cmp_alpha(ptr {subj_ptr}, i64 {subj_len}, ptr {lo_p}, i64 {lo_l})")
+                    self.emit(f"{c2} = call i32 @__cobol_cmp_alpha(ptr {subj_ptr}, i64 {subj_len}, ptr {hi_p}, i64 {hi_l})")
+                    ge = self.new_reg("erge")
+                    le = self.new_reg("erle")
+                    eq_reg = self.new_reg("erok")
+                    self.emit(f"{ge} = icmp sge i32 {c1}, 0")
+                    self.emit(f"{le} = icmp sle i32 {c2}, 0")
+                    self.emit(f"{eq_reg} = and i1 {ge}, {le}")
+                else:
+                    lo_v = self.emit_numeric_expr(br.condition.start)
+                    hi_v = self.emit_numeric_expr(br.condition.end)
+                    ge = self.new_reg("erge")
+                    le = self.new_reg("erle")
+                    eq_reg = self.new_reg("erok")
+                    self.emit(f"{ge} = fcmp oge double {subj_num}, {lo_v}")
+                    self.emit(f"{le} = fcmp ole double {subj_num}, {hi_v}")
+                    self.emit(f"{eq_reg} = and i1 {ge}, {le}")
+                self.emit_terminator(f"br i1 {eq_reg}, label %{body_lbl}, label %{next_lbl}")
             elif isinstance(br.condition, ExprNode):
                 if subj_is_alpha:
                     c_ptr, c_len = self.emit_string_slice(br.condition)
@@ -1247,8 +1484,23 @@ class LLVMIRGenerator:
     def _emit_inspect(self, stmt: InspectStmt) -> None:
         if stmt.target is None:
             return
-        buf_ptr, buf_len, _ = self.emit_field_address_and_length(stmt.target)
+        if isinstance(stmt.target, IdentifierRef):
+            buf_ptr, buf_len, _ = self.emit_field_address_and_length(stmt.target)
+        else:
+            buf_ptr, buf_len = self.emit_string_slice(stmt.target)
         clauses = stmt.clauses
+
+        def _decode_inspect_lit(tok: str) -> str:
+            if tok.startswith('"') and tok.endswith('"') and len(tok) >= 2:
+                return tok[1:-1]
+            up = tok.upper()
+            if up in ("SPACE", "SPACES"):
+                return " "
+            if up in ("ZERO", "ZEROS", "ZEROES"):
+                return "0"
+            if up in ("LOW-VALUE", "LOW-VALUES"):
+                return "\x00"
+            return tok.strip('"')
 
         # Extrai delimitadores opcionais BEFORE / AFTER INITIAL "<char>"
         before_ptr, before_len = "null", 0
@@ -1256,12 +1508,10 @@ class LLVMIRGenerator:
         for idx, tok in enumerate(clauses):
             if tok == "BEFORE" and idx + 1 < len(clauses):
                 lit_tok = clauses[idx + 2] if (idx + 2 < len(clauses) and clauses[idx + 1] == "INITIAL") else clauses[idx + 1]
-                clean = lit_tok.strip('"')
-                before_ptr, before_len = self.intern_string(clean, null_terminate=False)
+                before_ptr, before_len = self.intern_string(_decode_inspect_lit(lit_tok), null_terminate=False)
             elif tok == "AFTER" and idx + 1 < len(clauses):
                 lit_tok = clauses[idx + 2] if (idx + 2 < len(clauses) and clauses[idx + 1] == "INITIAL") else clauses[idx + 1]
-                clean = lit_tok.strip('"')
-                after_ptr, after_len = self.intern_string(clean, null_terminate=False)
+                after_ptr, after_len = self.intern_string(_decode_inspect_lit(lit_tok), null_terminate=False)
 
         if stmt.mode == "TALLYING" and clauses:
             counter_name = clauses[0]
@@ -1276,12 +1526,10 @@ class LLVMIRGenerator:
                     tally_mode = 0
                 elif tok == "ALL" and idx + 1 < len(clauses):
                     tally_mode = 1
-                    clean = clauses[idx + 1].strip('"')
-                    pat_ptr, pat_len = self.intern_string(clean, null_terminate=False)
+                    pat_ptr, pat_len = self.intern_string(_decode_inspect_lit(clauses[idx + 1]), null_terminate=False)
                 elif tok == "LEADING" and idx + 1 < len(clauses):
                     tally_mode = 2
-                    clean = clauses[idx + 1].strip('"')
-                    pat_ptr, pat_len = self.intern_string(clean, null_terminate=False)
+                    pat_ptr, pat_len = self.intern_string(_decode_inspect_lit(clauses[idx + 1]), null_terminate=False)
 
             added_i64 = self.new_reg("tally_n")
             self.emit(
@@ -1731,6 +1979,93 @@ next:
 
 exit:
   ret void
+}
+
+define internal void @__cobol_reverse_copy(ptr %dst, ptr %src, i64 %len) {
+entry:
+  br label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %body ]
+  %done = icmp uge i64 %i, %len
+  br i1 %done, label %exit, label %body
+
+body:
+  %rev_idx1 = sub i64 %len, 1
+  %rev_idx = sub i64 %rev_idx1, %i
+  %sp = getelementptr inbounds i8, ptr %src, i64 %rev_idx
+  %dp = getelementptr inbounds i8, ptr %dst, i64 %i
+  %ch = load i8, ptr %sp
+  store i8 %ch, ptr %dp
+  %i.next = add i64 %i, 1
+  br label %loop
+
+exit:
+  ret void
+}
+
+define internal i1 @__cobol_is_numeric(ptr %buf, i64 %len) {
+entry:
+  %empty = icmp eq i64 %len, 0
+  br i1 %empty, label %ret_false, label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %cont ]
+  %done = icmp uge i64 %i, %len
+  br i1 %done, label %ret_true, label %body
+
+body:
+  %p = getelementptr inbounds i8, ptr %buf, i64 %i
+  %c = load i8, ptr %p
+  %ge0 = icmp sge i8 %c, 48
+  %le9 = icmp sle i8 %c, 57
+  %is_d = and i1 %ge0, %le9
+  br i1 %is_d, label %cont, label %ret_false
+
+cont:
+  %i.next = add i64 %i, 1
+  br label %loop
+
+ret_true:
+  ret i1 true
+
+ret_false:
+  ret i1 false
+}
+
+define internal i1 @__cobol_is_alpha(ptr %buf, i64 %len) {
+entry:
+  %empty = icmp eq i64 %len, 0
+  br i1 %empty, label %ret_false, label %loop
+
+loop:
+  %i = phi i64 [ 0, %entry ], [ %i.next, %cont ]
+  %done = icmp uge i64 %i, %len
+  br i1 %done, label %ret_true, label %body
+
+body:
+  %p = getelementptr inbounds i8, ptr %buf, i64 %i
+  %c = load i8, ptr %p
+  %geA = icmp sge i8 %c, 65
+  %leZ = icmp sle i8 %c, 90
+  %is_up = and i1 %geA, %leZ
+  %gea = icmp sge i8 %c, 97
+  %lez = icmp sle i8 %c, 122
+  %is_lo = and i1 %gea, %lez
+  %is_sp = icmp eq i8 %c, 32
+  %is_lt = or i1 %is_up, %is_lo
+  %ok = or i1 %is_lt, %is_sp
+  br i1 %ok, label %cont, label %ret_false
+
+cont:
+  %i.next = add i64 %i, 1
+  br label %loop
+
+ret_true:
+  ret i1 true
+
+ret_false:
+  ret i1 false
 }
 
 define internal i32 @__cobol_cmp_alpha(ptr %a, i64 %alen, ptr %b, i64 %blen) {

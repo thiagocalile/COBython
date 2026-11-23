@@ -93,6 +93,7 @@ class DataItemNode(ASTNode):
     name: str
     pic: str | None = None
     value: str | None = None
+    usage: str | None = None
     occurs: OccursClauseNode | None = None
     children: list[DataItemNode] = field(default_factory=list)
 
@@ -108,6 +109,7 @@ class FileDescriptionNode(ASTNode):
 class DataDivisionNode(ASTNode):
     file_section: list[FileDescriptionNode] = field(default_factory=list)
     working_storage: list[DataItemNode] = field(default_factory=list)
+    linkage_section: list[DataItemNode] = field(default_factory=list)
 
 
 # --- EXPRESSÕES E CONDIÇÕES ---
@@ -129,6 +131,19 @@ class IdentifierRef(ExprNode):
     name: str
     qualifiers: list[str] = field(default_factory=list)
     subscripts: list[ExprNode] = field(default_factory=list)
+    ref_mod_start: ExprNode | None = None
+    ref_mod_length: ExprNode | None = None
+
+
+@dataclass
+class LengthOfNode(ExprNode):
+    target: IdentifierRef
+
+
+@dataclass
+class EvaluateRangeNode(ExprNode):
+    start: ExprNode
+    end: ExprNode
 
 
 @dataclass
@@ -158,6 +173,13 @@ class ConditionNode(ASTNode):
 @dataclass
 class SimpleConditionNode(ConditionNode):
     operand: ExprNode
+
+
+@dataclass
+class ClassConditionNode(ConditionNode):
+    operand: ExprNode
+    class_name: str  # NUMERIC, ALPHABETIC, ALPHABETIC-LOWER, ALPHABETIC-UPPER
+    negated: bool = False
 
 
 @dataclass
@@ -206,15 +228,46 @@ class MoveStmt(StatementNode):
 
 @dataclass
 class PerformStmt(StatementNode):
-    target: str
+    target: str | None = None
     thru: str | None = None
     until: ConditionNode | None = None
     times: ExprNode | None = None
+    varying_var: IdentifierRef | None = None
+    varying_from: ExprNode | None = None
+    varying_by: ExprNode | None = None
+    inline_body: list[StatementNode] = field(default_factory=list)
 
 
 @dataclass
 class StopRunStmt(StatementNode):
     pass
+
+
+@dataclass
+class ExitStmt(StatementNode):
+    mode: str = ""  # "", "PROGRAM", "SECTION", "PARAGRAPH"
+
+
+@dataclass
+class ContinueStmt(StatementNode):
+    pass
+
+
+@dataclass
+class GobackStmt(StatementNode):
+    pass
+
+
+@dataclass
+class InitializeStmt(StatementNode):
+    targets: list[IdentifierRef] = field(default_factory=list)
+    replacing: list[tuple[str, ExprNode]] = field(default_factory=list)
+
+
+@dataclass
+class CallStmt(StatementNode):
+    program: ExprNode | None = None
+    using: list[IdentifierRef] = field(default_factory=list)
 
 
 @dataclass
@@ -323,7 +376,7 @@ class ComputeStmt(StatementNode):
 
 @dataclass
 class EvaluateWhenBranch(ASTNode):
-    condition: ExprNode | str  # ExprNode ou "OTHER"
+    condition: ExprNode | ConditionNode | str  # ExprNode, ConditionNode, "OTHER", "ANY"
     body: list[StatementNode] = field(default_factory=list)
 
 
@@ -355,7 +408,7 @@ class SetStmt(StatementNode):
 
 @dataclass
 class InspectStmt(StatementNode):
-    target: IdentifierRef | None = None
+    target: ExprNode | None = None
     mode: str = ""  # TALLYING, REPLACING, CONVERTING
     clauses: list[str] = field(default_factory=list)
 
@@ -383,6 +436,7 @@ class ProcedureDivisionNode(ASTNode):
     sentences: list[SentenceNode] = field(default_factory=list)
     paragraphs: list[ParagraphNode] = field(default_factory=list)
     sections: list[ProcedureSectionNode] = field(default_factory=list)
+    using_params: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -420,6 +474,18 @@ STATEMENT_VERBS = {
     "OPEN", "CLOSE", "READ", "WRITE", "START",
     "ADD", "SUBTRACT", "MULTIPLY", "DIVIDE", "COMPUTE",
     "EVALUATE", "SEARCH", "SET", "INSPECT",
+    "EXIT", "CONTINUE", "GOBACK", "INITIALIZE", "CALL",
+}
+
+USAGE_KEYWORDS = {
+    "COMP", "COMP-1", "COMP-2", "COMP-3", "COMP-4", "COMP-5",
+    "COMPUTATIONAL", "COMPUTATIONAL-1", "COMPUTATIONAL-2",
+    "COMPUTATIONAL-3", "COMPUTATIONAL-4", "COMPUTATIONAL-5",
+    "BINARY", "DISPLAY", "PACKED-DECIMAL", "INDEX",
+}
+
+CLASS_CONDITION_NAMES = {
+    "NUMERIC", "ALPHABETIC", "ALPHABETIC-LOWER", "ALPHABETIC-UPPER",
 }
 
 SCOPE_DELIMITERS = {
@@ -590,16 +656,22 @@ class Parser:
             return False
         return (self.is_identifier_token(t1) or t1.type == "NUMBER") and t2.type == "DOT"
 
-    def recover_to_dot_or_header(self) -> None:
+    def recover_to_dot_or_header(
+        self, *, stop_on_section: bool = True, stop_on_paragraph: bool = True
+    ) -> None:
+        start_pos = self.pos
         while not self.at_end():
             tok = self.current()
             if tok.type == "DOT":
                 self.advance()
                 return
-            if self.is_division_header() or self.is_section_header() or self.is_end_program():
+            if self.is_division_header() or self.is_end_program():
                 return
-            if self.is_procedure_paragraph_header():
-                return
+            if self.pos > start_pos:
+                if stop_on_section and self.is_section_header():
+                    return
+                if stop_on_paragraph and self.is_procedure_paragraph_header():
+                    return
             self.advance()
 
     # ==========================================================================
@@ -999,12 +1071,23 @@ class Parser:
                 self.advance()  # SECTION
                 self.consume_dot("WORKING-STORAGE SECTION")
                 node.working_storage.extend(self.parse_data_items_hierarchy())
+            elif self.match_word("LINKAGE") and self.peek(1) and self.peek(1).type == "SECTION":
+                lk_tok = self.advance()  # LINKAGE
+                if lk_tok.area != "AREA_A":
+                    self.error(
+                        "Cabeçalho 'LINKAGE SECTION' deve iniciar na Área A",
+                        lk_tok,
+                        severity="W",
+                    )
+                self.advance()  # SECTION
+                self.consume_dot("LINKAGE SECTION")
+                node.linkage_section.extend(self.parse_data_items_hierarchy())
             elif tok.type == "NUMBER":
                 # Permite declarações de dados diretamente na DATA DIVISION (ex: test.cob)
                 node.working_storage.extend(self.parse_data_items_hierarchy())
             else:
                 self.error(f"Elemento inesperado na DATA DIVISION: '{tok.value}'", tok)
-                self.recover_to_dot_or_header()
+                self.recover_to_dot_or_header(stop_on_paragraph=False)
 
         return node
 
@@ -1194,6 +1277,7 @@ class Parser:
 
         pic_str: str | None = None
         val_str: str | None = None
+        usage_str: str | None = None
         occurs_node: OccursClauseNode | None = None
 
         while not self.at_end() and self.current().type != "DOT":
@@ -1212,6 +1296,16 @@ class Parser:
                         self.error(f"Máscara PICTURE inválida: '{pic_str}'", pic_tok)
                 else:
                     self.error(f"Esperada máscara de tipo após PIC/PICTURE em '{name}'", pic_tok)
+            elif self.match_word("USAGE"):
+                self.advance()  # USAGE
+                if self.match_word("IS"):
+                    self.advance()
+                if not self.at_end() and self.current().value in USAGE_KEYWORDS:
+                    usage_str = self.advance().value
+                else:
+                    self.error(f"Esperado modo de USAGE válido em '{name}'", self.current())
+            elif tok.value in USAGE_KEYWORDS:
+                usage_str = self.advance().value
             elif self.match_word("VALUE", "VALUES"):
                 self.advance()  # VALUE / VALUES
                 if self.match_word("IS", "ARE"):
@@ -1244,7 +1338,7 @@ class Parser:
                     if self.match_word("BY"):
                         self.advance()
                     while not self.at_end() and self.is_identifier_token(self.current()):
-                        if self.match_word("PIC", "PICTURE", "VALUE", "VALUES", "OCCURS"):
+                        if self.match_word("PIC", "PICTURE", "VALUE", "VALUES", "OCCURS", "USAGE") or self.current().value in USAGE_KEYWORDS:
                             break
                         indexed_by.append(self.advance().value)
                         self.skip_optional_separators()
@@ -1261,6 +1355,7 @@ class Parser:
             name=name,
             pic=pic_str,
             value=val_str,
+            usage=usage_str,
             occurs=occurs_node,
         )
 
@@ -1273,9 +1368,27 @@ class Parser:
     def parse_procedure_division(self) -> ProcedureDivisionNode:
         start_tok = self.advance()  # PROCEDURE
         self.consume_word("DIVISION", "Esperado 'DIVISION' após 'PROCEDURE'")
+
+        using_params: list[str] = []
+        if self.match_word("USING"):
+            self.advance()  # USING
+            while not self.at_end() and self.current().type != "DOT":
+                if self.is_division_header() or self.is_section_header() or self.is_end_program():
+                    break
+                if self.match_word("BY"):
+                    self.advance()
+                if self.match_word("REFERENCE", "VALUE", "CONTENT"):
+                    self.advance()
+                    continue
+                p_tok = self.consume_identifier("parâmetro após PROCEDURE DIVISION USING")
+                if p_tok is None:
+                    break
+                using_params.append(p_tok.value)
+                self.skip_optional_separators()
+
         self.consume_dot("PROCEDURE DIVISION")
 
-        node = ProcedureDivisionNode(line=start_tok.line, col=start_tok.col)
+        node = ProcedureDivisionNode(line=start_tok.line, col=start_tok.col, using_params=using_params)
 
         current_section: ProcedureSectionNode | None = None
         current_paragraph: ParagraphNode | None = None
@@ -1398,11 +1511,27 @@ class Parser:
                 or self.is_end_program()
             ):
                 break
+            pos_before = self.pos
             stmt = self.parse_statement()
             if stmt is not None:
                 stmts.append(stmt)
             else:
-                break
+                if self.pos == pos_before and not self.at_end():
+                    self.advance()
+                while not self.at_end():
+                    t = self.current()
+                    if (
+                        t.type == "DOT"
+                        or self.match_word(*stop_words)
+                        or t.value in STATEMENT_VERBS
+                        or t.value in SCOPE_DELIMITERS
+                        or self.is_division_header()
+                        or self.is_section_header()
+                        or self.is_procedure_paragraph_header()
+                        or self.is_end_program()
+                    ):
+                        break
+                    self.advance()
         return stmts
 
     def parse_statement(self) -> StatementNode | None:
@@ -1461,6 +1590,16 @@ class Parser:
                 return self.parse_set_stmt()
             case "INSPECT":
                 return self.parse_inspect_stmt()
+            case "EXIT":
+                return self.parse_exit_stmt()
+            case "CONTINUE":
+                return self.parse_continue_stmt()
+            case "GOBACK":
+                return self.parse_goback_stmt()
+            case "INITIALIZE":
+                return self.parse_initialize_stmt()
+            case "CALL":
+                return self.parse_call_stmt()
             case _:
                 self.error(f"Instrução inválida ou desconhecida na PROCEDURE DIVISION: '{tok.value}'", tok)
                 return None
@@ -1522,32 +1661,75 @@ class Parser:
 
     def parse_perform_stmt(self) -> PerformStmt:
         start_tok = self.advance()  # PERFORM
-        target_tok = self.current()
-        if target_tok is not None and (self.is_identifier_token(target_tok) or target_tok.type == "NUMBER"):
-            target = self.advance().value
-        else:
-            self.error("Esperado nome de parágrafo ou seção após PERFORM", target_tok)
-            target = "<DESCONHECIDO>"
 
+        target: str | None = None
         thru: str | None = None
-        if self.match_word("THRU", "THROUGH"):
-            self.advance()
-            thru_tok = self.current()
-            if thru_tok is not None and (self.is_identifier_token(thru_tok) or thru_tok.type == "NUMBER"):
-                thru = self.advance().value
-            else:
-                self.error("Esperado nome de parágrafo após THRU em PERFORM", thru_tok)
-
         until: ConditionNode | None = None
         times: ExprNode | None = None
+        varying_var: IdentifierRef | None = None
+        varying_from: ExprNode | None = None
+        varying_by: ExprNode | None = None
+        inline_body: list[StatementNode] = []
 
-        if self.match_word("UNTIL"):
+        # Detecta PERFORM inline: PERFORM [WITH TEST ...] VARYING/UNTIL | PERFORM <n> TIMES | PERFORM <stmt> ... END-PERFORM
+        is_inline = (
+            self.match_word("VARYING", "UNTIL", "WITH")
+            or (
+                not self.at_end()
+                and (self.current().type == "NUMBER" or self.is_identifier_token(self.current()))
+                and self.peek(1) is not None
+                and self.peek(1).value == "TIMES"
+            )
+            or (not self.at_end() and self.current().value in STATEMENT_VERBS)
+        )
+
+        if not is_inline:
+            target_tok = self.current()
+            if target_tok is not None and (self.is_identifier_token(target_tok) or target_tok.type == "NUMBER"):
+                target = self.advance().value
+            else:
+                self.error("Esperado nome de parágrafo ou seção após PERFORM", target_tok)
+                target = "<DESCONHECIDO>"
+
+            if self.match_word("THRU", "THROUGH"):
+                self.advance()
+                thru_tok = self.current()
+                if thru_tok is not None and (self.is_identifier_token(thru_tok) or thru_tok.type == "NUMBER"):
+                    thru = self.advance().value
+                else:
+                    self.error("Esperado nome de parágrafo após THRU em PERFORM", thru_tok)
+
+        # Cláusula opcional WITH TEST BEFORE/AFTER
+        if self.match_word("WITH"):
+            self.advance()
+        if self.match_word("TEST"):
+            self.advance()
+            if self.match_word("BEFORE", "AFTER"):
+                self.advance()
+
+        if self.match_word("VARYING"):
+            self.advance()  # VARYING
+            varying_var = self.parse_identifier_ref("variável de controle após PERFORM VARYING")
+            self.consume_word("FROM", "Esperado 'FROM' após variável em PERFORM VARYING")
+            varying_from = self.parse_arithmetic_expression()
+            self.consume_word("BY", "Esperado 'BY' após expressão FROM em PERFORM VARYING")
+            varying_by = self.parse_arithmetic_expression()
+            if self.consume_word("UNTIL", "Esperado 'UNTIL' em PERFORM VARYING"):
+                until = self.parse_condition()
+        elif self.match_word("UNTIL"):
             self.advance()  # UNTIL
             until = self.parse_condition()
         elif not self.at_end() and (self.current().type == "NUMBER" or self.is_identifier_token(self.current())):
             if self.peek(1) and self.peek(1).value == "TIMES":
                 times = self.parse_operand()
                 self.advance()  # TIMES
+
+        if is_inline:
+            inline_body = self.parse_statement_list_until("END-PERFORM")
+            if self.match_word("END-PERFORM"):
+                self.advance()
+            else:
+                self.error("Esperado 'END-PERFORM' para encerrar PERFORM inline", self.current())
 
         return PerformStmt(
             line=start_tok.line,
@@ -1556,7 +1738,94 @@ class Parser:
             thru=thru,
             until=until,
             times=times,
+            varying_var=varying_var,
+            varying_from=varying_from,
+            varying_by=varying_by,
+            inline_body=inline_body,
         )
+
+    def parse_exit_stmt(self) -> ExitStmt:
+        start_tok = self.advance()  # EXIT
+        mode = ""
+        if self.match_word("PROGRAM", "SECTION", "PARAGRAPH"):
+            mode = self.advance().value
+        return ExitStmt(line=start_tok.line, col=start_tok.col, mode=mode)
+
+    def parse_continue_stmt(self) -> ContinueStmt:
+        start_tok = self.advance()  # CONTINUE
+        return ContinueStmt(line=start_tok.line, col=start_tok.col)
+
+    def parse_goback_stmt(self) -> GobackStmt:
+        start_tok = self.advance()  # GOBACK
+        return GobackStmt(line=start_tok.line, col=start_tok.col)
+
+    def parse_initialize_stmt(self) -> InitializeStmt:
+        start_tok = self.advance()  # INITIALIZE
+        targets: list[IdentifierRef] = []
+        while (
+            not self.at_end()
+            and not self.is_statement_boundary()
+            and not self.match_word("REPLACING")
+        ):
+            t = self.parse_identifier_ref("variável após INITIALIZE")
+            if t is None:
+                break
+            targets.append(t)
+            self.skip_optional_separators()
+
+        replacing: list[tuple[str, ExprNode]] = []
+        if self.match_word("REPLACING"):
+            self.advance()  # REPLACING
+            while not self.at_end() and not self.is_statement_boundary():
+                if self.match_word(
+                    "ALPHABETIC", "ALPHANUMERIC", "NUMERIC",
+                    "ALPHANUMERIC-EDITED", "NUMERIC-EDITED",
+                ):
+                    cat = self.advance().value
+                    if self.match_word("DATA"):
+                        self.advance()
+                    self.consume_word("BY", f"Esperado 'BY' após '{cat}' em INITIALIZE REPLACING")
+                    val = self.parse_operand("valor após BY em INITIALIZE REPLACING")
+                    if val is not None:
+                        replacing.append((cat, val))
+                    self.skip_optional_separators()
+                else:
+                    break
+
+        if not targets:
+            self.error("Instrução INITIALIZE exige ao menos uma variável alvo", start_tok)
+
+        return InitializeStmt(
+            line=start_tok.line,
+            col=start_tok.col,
+            targets=targets,
+            replacing=replacing,
+        )
+
+    def parse_call_stmt(self) -> CallStmt:
+        start_tok = self.advance()  # CALL
+        prog = self.parse_operand("nome do subprograma após CALL")
+        using_args: list[IdentifierRef] = []
+        if self.match_word("USING"):
+            self.advance()  # USING
+            while (
+                not self.at_end()
+                and not self.is_statement_boundary()
+                and not self.match_word("RETURNING", "GIVING", "ON", "NOT", "END-CALL")
+            ):
+                if self.match_word("BY"):
+                    self.advance()
+                if self.match_word("REFERENCE", "CONTENT", "VALUE"):
+                    self.advance()
+                    continue
+                arg = self.parse_identifier_ref("parâmetro após CALL ... USING")
+                if arg is None:
+                    break
+                using_args.append(arg)
+                self.skip_optional_separators()
+        if self.match_word("END-CALL"):
+            self.advance()
+        return CallStmt(line=start_tok.line, col=start_tok.col, program=prog, using=using_args)
 
     def parse_stop_stmt(self) -> StopRunStmt:
         start_tok = self.advance()  # STOP
@@ -1582,7 +1851,7 @@ class Parser:
             self.advance()
 
         then_body = self.parse_statement_list_until(
-            "ELSE", "END-IF", "WHEN", "END-EVALUATE", "END-SEARCH"
+            "ELSE", "END-IF", "WHEN", "END-EVALUATE", "END-SEARCH", "END-PERFORM"
         )
         if not then_body:
             self.error("Bloco verdadeiro do comando IF não contém nenhuma instrução", start_tok)
@@ -1591,7 +1860,7 @@ class Parser:
         if self.match_word("ELSE"):
             else_tok = self.advance()  # ELSE
             else_body = self.parse_statement_list_until(
-                "ELSE", "END-IF", "WHEN", "END-EVALUATE", "END-SEARCH"
+                "ELSE", "END-IF", "WHEN", "END-EVALUATE", "END-SEARCH", "END-PERFORM"
             )
             if not else_body:
                 self.error("Bloco ELSE não contém nenhuma instrução", else_tok)
@@ -2051,8 +2320,10 @@ class Parser:
 
     def parse_evaluate_stmt(self) -> EvaluateStmt:
         start_tok = self.advance()  # EVALUATE
+        is_bool_subject = False
         if self.match_word("TRUE", "FALSE"):
             tok = self.advance()
+            is_bool_subject = True
             subject: ExprNode | None = LiteralNode(
                 line=tok.line, col=tok.col, literal_type="BOOLEAN", value=tok.value
             )
@@ -2062,12 +2333,47 @@ class Parser:
         branches: list[EvaluateWhenBranch] = []
         while not self.at_end() and self.match_word("WHEN"):
             when_tok = self.advance()  # WHEN
+            cond: ExprNode | ConditionNode | str
             if self.match_word("OTHER"):
                 self.advance()
-                cond: ExprNode | str = "OTHER"
+                cond = "OTHER"
+            elif self.match_word("ANY"):
+                self.advance()
+                cond = "ANY"
+            elif is_bool_subject:
+                cond_node = self.parse_condition()
+                cond = cond_node if cond_node is not None else "INVALID"
+            elif self._is_class_condition_ahead() or self._is_relational_operator_ahead():
+                # Padrão ISO COBOL / GnuCOBOL exige EVALUATE TRUE para condições relacionais ou de classe em WHEN
+                bad_tok = self.current()
+                self.error(
+                    "Cláusula WHEN com condição relacional ou de classe exige 'EVALUATE TRUE' "
+                    "(não permitido diretamente sobre sujeito de valor no padrão COBOL/GnuCOBOL)",
+                    bad_tok,
+                )
+                if self._is_class_condition_ahead():
+                    if self.match_word("IS"):
+                        self.advance()
+                    if self.match_word("NOT"):
+                        self.advance()
+                    self.advance()  # NUMERIC / ALPHABETIC
+                else:
+                    self.parse_relational_operator()
+                    self.parse_arithmetic_expression()
+                cond = "INVALID"
             else:
                 cond_expr = self.parse_arithmetic_expression()
-                cond = cond_expr if cond_expr is not None else "INVALID"
+                if cond_expr is not None and self.match_word("THRU", "THROUGH"):
+                    thru_tok = self.advance()
+                    end_expr = self.parse_arithmetic_expression()
+                    if end_expr is not None:
+                        cond = EvaluateRangeNode(
+                            line=thru_tok.line, col=thru_tok.col, start=cond_expr, end=end_expr
+                        )
+                    else:
+                        cond = cond_expr
+                else:
+                    cond = cond_expr if cond_expr is not None else "INVALID"
 
             body = self.parse_statement_list_until("WHEN", "END-EVALUATE")
             branches.append(
@@ -2145,7 +2451,7 @@ class Parser:
 
     def parse_inspect_stmt(self) -> InspectStmt:
         start_tok = self.advance()  # INSPECT
-        target = self.parse_identifier_ref("variável alvo após INSPECT")
+        target = self.parse_operand("operando alvo após INSPECT")
 
         mode = ""
         if self.match_word("TALLYING", "REPLACING", "CONVERTING"):
@@ -2193,6 +2499,15 @@ class Parser:
                 value=tok.value,
             )
 
+        # Registrador especial LENGTH OF <identificador>
+        if self.match_word("LENGTH") and self.peek(1) is not None and self.peek(1).value == "OF":
+            l_tok = self.advance()  # LENGTH
+            self.advance()          # OF
+            target_ref = self.parse_identifier_ref("variável após LENGTH OF")
+            if target_ref is not None:
+                return LengthOfNode(line=l_tok.line, col=l_tok.col, target=target_ref)
+            return None
+
         # Chamada de função intrínseca: FUNCTION <Nome>([arg, ...])
         if self.match_word("FUNCTION"):
             f_tok = self.advance()  # FUNCTION
@@ -2238,20 +2553,36 @@ class Parser:
             qualifiers.append(q_tok.value)
 
         subscripts: list[ExprNode] = []
-        if not self.at_end() and self.current().type == "LEFT_PAREN":
+        ref_mod_start: ExprNode | None = None
+        ref_mod_length: ExprNode | None = None
+
+        while not self.at_end() and self.current().type == "LEFT_PAREN":
             self.advance()  # (
-            while not self.at_end() and self.current().type != "RIGHT_PAREN":
-                if self.current().type == "DOT":
-                    break
-                sub = self.parse_arithmetic_expression()
-                if sub is None:
-                    break
-                subscripts.append(sub)
-                self.skip_optional_separators()
+            if not self.at_end() and self.current().type != "RIGHT_PAREN":
+                first_expr = self.parse_arithmetic_expression()
+                if not self.at_end() and self.current().type == "COLON":
+                    # Modificação de referência: VAR(inicio:[tamanho])
+                    self.advance()  # :
+                    ref_mod_start = first_expr
+                    if not self.at_end() and self.current().type != "RIGHT_PAREN":
+                        ref_mod_length = self.parse_arithmetic_expression()
+                else:
+                    if first_expr is not None:
+                        subscripts.append(first_expr)
+                    self.skip_optional_separators()
+                    while not self.at_end() and self.current().type != "RIGHT_PAREN":
+                        if self.current().type == "DOT":
+                            break
+                        sub = self.parse_arithmetic_expression()
+                        if sub is None:
+                            break
+                        subscripts.append(sub)
+                        self.skip_optional_separators()
             if not self.at_end() and self.current().type == "RIGHT_PAREN":
                 self.advance()  # )
             else:
                 self.error(f"Esperado ')' ao fechar índice/subscrito de '{tok.value}'", self.current())
+                break
 
         return IdentifierRef(
             line=tok.line,
@@ -2259,6 +2590,8 @@ class Parser:
             name=tok.value,
             qualifiers=qualifiers,
             subscripts=subscripts,
+            ref_mod_start=ref_mod_start,
+            ref_mod_length=ref_mod_length,
         )
 
     def parse_arithmetic_expression(self) -> ExprNode | None:
@@ -2383,9 +2716,54 @@ class Parser:
     def _parse_primary_condition(
         self, inherited_rel: RelationConditionNode | None = None
     ) -> ConditionNode | None:
+        # Suporte a condições entre parênteses: ex. (WRK-IND1 > WRK-QTDE-REG) OR (WRK-ENCONTROU EQUAL 'S')
+        # Usa lookahead com backtracking para não conflitar com expressões aritméticas como (A + B) > C.
+        if not self.at_end() and self.current().type == "LEFT_PAREN":
+            saved_pos = self.pos
+            saved_err_len = len(self.errors)
+            self.advance()  # (
+            inner_cond = self.parse_condition()
+            if (
+                inner_cond is not None
+                and len(self.errors) == saved_err_len
+                and not self.at_end()
+                and self.current().type == "RIGHT_PAREN"
+            ):
+                self.advance()  # )
+                next_tok = self.current()
+                is_arith_or_rel_cont = (
+                    self._is_class_condition_ahead()
+                    or self._is_relational_operator_ahead()
+                    or (
+                        next_tok is not None
+                        and next_tok.type in ("PLUS", "MINUS", "MULTIPLY", "DIVIDE", "POWER")
+                    )
+                )
+                if not is_arith_or_rel_cont:
+                    return inner_cond
+            self.pos = saved_pos
+            del self.errors[saved_err_len:]
+
         left_expr = self.parse_arithmetic_expression()
         if left_expr is None:
             return None
+
+        # Condição de classe: <expr> [IS] [NOT] NUMERIC | ALPHABETIC
+        if self._is_class_condition_ahead():
+            if self.match_word("IS"):
+                self.advance()
+            negated = False
+            if self.match_word("NOT"):
+                self.advance()
+                negated = True
+            cls_tok = self.advance()
+            return ClassConditionNode(
+                line=left_expr.line,
+                col=left_expr.col,
+                operand=left_expr,
+                class_name=cls_tok.value,
+                negated=negated,
+            )
 
         if self._is_relational_operator_ahead():
             op_str = self.parse_relational_operator()
@@ -2438,14 +2816,38 @@ class Parser:
             return Parser._find_last_relation(cond.operand)
         return None
 
+    def _is_class_condition_ahead(self) -> bool:
+        off = 0
+        t = self.peek(off)
+        if t is not None and t.value == "IS":
+            off += 1
+            t = self.peek(off)
+        if t is not None and t.value == "NOT":
+            off += 1
+            t = self.peek(off)
+        return t is not None and t.value in CLASS_CONDITION_NAMES
+
     def _is_relational_operator_ahead(self) -> bool:
         tok = self.current()
         if tok is None:
             return False
         if tok.type in ("EQUAL", "GREATER_THAN", "LESS_THAN", "GREATER_EQUAL", "LESS_EQUAL"):
             return True
-        if self.match_word("IS", "EQUAL", "GREATER", "LESS"):
+        if self.match_word("EQUAL", "GREATER", "LESS"):
             return True
+        if self.match_word("IS"):
+            nxt = self.peek(1)
+            if nxt is None:
+                return False
+            if nxt.type in ("EQUAL", "GREATER_THAN", "LESS_THAN", "GREATER_EQUAL", "LESS_EQUAL") or nxt.value in ("EQUAL", "GREATER", "LESS"):
+                return True
+            if nxt.value == "NOT":
+                nxt2 = self.peek(2)
+                return nxt2 is not None and (
+                    nxt2.type in ("EQUAL", "GREATER_THAN", "LESS_THAN", "GREATER_EQUAL", "LESS_EQUAL")
+                    or nxt2.value in ("EQUAL", "GREATER", "LESS")
+                )
+            return False
         if self.match_word("NOT") and self.peek(1) and self.peek(1).value in (
             "=", ">", "<", ">=", "<=", "EQUAL", "GREATER", "LESS"
         ):
@@ -2504,7 +2906,14 @@ def format_expr(expr: ExprNode | None) -> str:
         if expr.subscripts:
             subs = ", ".join(format_expr(s) for s in expr.subscripts)
             base += f"({subs})"
+        if expr.ref_mod_start is not None:
+            len_part = format_expr(expr.ref_mod_length) if expr.ref_mod_length is not None else ""
+            base += f"({format_expr(expr.ref_mod_start)}:{len_part})"
         return base
+    if isinstance(expr, LengthOfNode):
+        return f"LENGTH OF {format_expr(expr.target)}"
+    if isinstance(expr, EvaluateRangeNode):
+        return f"{format_expr(expr.start)} THRU {format_expr(expr.end)}"
     if isinstance(expr, FunctionCallNode):
         args = ", ".join(format_expr(a) for a in expr.arguments)
         return f"FUNCTION {expr.function_name}({args})"
@@ -2520,6 +2929,9 @@ def format_condition(cond: ConditionNode | None) -> str:
         return "<condição inválida>"
     if isinstance(cond, SimpleConditionNode):
         return format_expr(cond.operand)
+    if isinstance(cond, ClassConditionNode):
+        neg = "NOT " if cond.negated else ""
+        return f"{format_expr(cond.operand)} IS {neg}{cond.class_name}"
     if isinstance(cond, RelationConditionNode):
         return f"{format_expr(cond.left)} {cond.operator} {format_expr(cond.right)}"
     if isinstance(cond, NotConditionNode):
@@ -2539,6 +2951,8 @@ def format_ast(program: ProgramNode) -> str:
         details = [f"level={item.level:02d}", f"name={item.name}"]
         if item.pic is not None:
             details.append(f"pic={item.pic}")
+        if item.usage is not None:
+            details.append(f"usage={item.usage}")
         if item.value is not None:
             details.append(f"value={item.value}")
         if item.occurs is not None:
@@ -2562,16 +2976,43 @@ def format_ast(program: ProgramNode) -> str:
             targets = ", ".join(format_expr(t) for t in stmt.targets)
             emit(indent, f"MoveStmt(from={format_expr(stmt.source)} -> to=[{targets}]) {loc}")
         elif isinstance(stmt, PerformStmt):
-            parts = [f"target={stmt.target}"]
+            parts: list[str] = []
+            if stmt.target:
+                parts.append(f"target={stmt.target}")
+            else:
+                parts.append("inline")
             if stmt.thru:
                 parts.append(f"thru={stmt.thru}")
+            if stmt.varying_var is not None:
+                parts.append(
+                    f"varying={format_expr(stmt.varying_var)} from={format_expr(stmt.varying_from)} by={format_expr(stmt.varying_by)}"
+                )
             if stmt.until:
                 parts.append(f"until=({format_condition(stmt.until)})")
             if stmt.times:
                 parts.append(f"times={format_expr(stmt.times)}")
             emit(indent, f"PerformStmt({', '.join(parts)}) {loc}")
+            for s in stmt.inline_body:
+                emit_statement(indent + 1, s)
         elif isinstance(stmt, StopRunStmt):
             emit(indent, f"StopRunStmt() {loc}")
+        elif isinstance(stmt, ExitStmt):
+            mode_str = f" {stmt.mode}" if stmt.mode else ""
+            emit(indent, f"ExitStmt({mode_str.strip()}) {loc}")
+        elif isinstance(stmt, ContinueStmt):
+            emit(indent, f"ContinueStmt() {loc}")
+        elif isinstance(stmt, GobackStmt):
+            emit(indent, f"GobackStmt() {loc}")
+        elif isinstance(stmt, InitializeStmt):
+            tgts = ", ".join(format_expr(t) for t in stmt.targets)
+            rep = ""
+            if stmt.replacing:
+                rep_parts = ", ".join(f"{c} BY {format_expr(v)}" for c, v in stmt.replacing)
+                rep = f", replacing=[{rep_parts}]"
+            emit(indent, f"InitializeStmt(targets=[{tgts}]{rep}) {loc}")
+        elif isinstance(stmt, CallStmt):
+            usg = f", using=[{', '.join(format_expr(u) for u in stmt.using)}]" if stmt.using else ""
+            emit(indent, f"CallStmt(program={format_expr(stmt.program)}{usg}) {loc}")
         elif isinstance(stmt, GoToStmt):
             emit(indent, f"GoToStmt(target={stmt.target}) {loc}")
         elif isinstance(stmt, IfStmt):
@@ -2661,7 +3102,12 @@ def format_ast(program: ProgramNode) -> str:
         elif isinstance(stmt, EvaluateStmt):
             emit(indent, f"EvaluateStmt(subject={format_expr(stmt.subject)}) {loc}")
             for br in stmt.branches:
-                cond_str = br.condition if isinstance(br.condition, str) else format_expr(br.condition)
+                if isinstance(br.condition, str):
+                    cond_str = br.condition
+                elif isinstance(br.condition, ConditionNode):
+                    cond_str = format_condition(br.condition)
+                else:
+                    cond_str = format_expr(br.condition)
                 emit(indent + 1, f"WHEN {cond_str}: [linha {br.line}]")
                 for s in br.body:
                     emit_statement(indent + 2, s)
@@ -2735,10 +3181,15 @@ def format_ast(program: ProgramNode) -> str:
             emit(2, "WorkingStorageSection")
             for item in data_div.working_storage:
                 emit_data_item(3, item)
+        if data_div.linkage_section:
+            emit(2, "LinkageSection")
+            for item in data_div.linkage_section:
+                emit_data_item(3, item)
 
     if program.procedure_division:
         proc_div = program.procedure_division
-        emit(1, f"ProcedureDivision [linha {proc_div.line}]")
+        usg = f" USING {', '.join(proc_div.using_params)}" if proc_div.using_params else ""
+        emit(1, f"ProcedureDivision{usg} [linha {proc_div.line}]")
         for sent in proc_div.sentences:
             emit_sentence(2, sent)
         for para in proc_div.paragraphs:

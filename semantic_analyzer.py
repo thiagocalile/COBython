@@ -21,20 +21,28 @@ from parser import (
     AcceptStmt,
     AddStmt,
     BinaryExprNode,
+    CallStmt,
+    ClassConditionNode,
     CloseStmt,
     ComputeStmt,
     ConditionNode,
+    ContinueStmt,
     DataItemNode,
     DisplayStmt,
     DivideStmt,
+    EvaluateRangeNode,
     EvaluateStmt,
+    ExitStmt,
     ExprNode,
     FileDescriptionNode,
     FunctionCallNode,
+    GobackStmt,
     GoToStmt,
     IdentifierRef,
     IfStmt,
+    InitializeStmt,
     InspectStmt,
+    LengthOfNode,
     LiteralNode,
     LogicalConditionNode,
     MoveStmt,
@@ -58,6 +66,11 @@ from parser import (
     WriteStmt,
     parse,
 )
+
+# Registradores especiais implícitos do COBOL (sem necessidade de declaração na DATA DIVISION)
+SPECIAL_REGISTERS: dict[str, tuple[str, str]] = {
+    "RETURN-CODE": ("NUMERIC", "S9(4)"),
+}
 
 # ==============================================================================
 # ESTRUTURAS DA TABELA DE SÍMBOLOS
@@ -209,6 +222,10 @@ class SemanticAnalyzer:
         # 2. WORKING-STORAGE SECTION
         for item in data_div.working_storage:
             self._register_data_item(item, ancestors=(), is_working_storage=True)
+
+        # 3. LINKAGE SECTION
+        for item in data_div.linkage_section:
+            self._register_data_item(item, ancestors=(), is_working_storage=False)
 
     def _register_data_item(
         self, item: DataItemNode, ancestors: tuple[str, ...], is_working_storage: bool = False
@@ -410,9 +427,26 @@ class SemanticAnalyzer:
         if len(ref.name) > 30 or not user_identifier_regex.match(ref.name):
             return None
 
-        # Valida também os subscritos/índices usados na referência, ex: DPTO(IDX, 1)
+        # Valida também os subscritos/índices e modificação de referência, ex: DPTO(IDX, 1) ou NOME(I:1)
         for sub in ref.subscripts:
             self._check_expression(sub)
+        if ref.ref_mod_start is not None:
+            self._check_expression(ref.ref_mod_start)
+        if ref.ref_mod_length is not None:
+            self._check_expression(ref.ref_mod_length)
+
+        if ref.name in SPECIAL_REGISTERS and not ref.qualifiers:
+            cat, pic = SPECIAL_REGISTERS[ref.name]
+            return SymbolEntry(
+                name=ref.name,
+                level=77,
+                category=cat,
+                pic=pic,
+                ancestors=(),
+                scope_parent="<SPECIAL>",
+                line=ref.line,
+                col=ref.col,
+            )
 
         candidates = self.symbols_by_name.get(ref.name, [])
         if not candidates:
@@ -486,6 +520,9 @@ class SemanticAnalyzer:
         proc = self.program.procedure_division
         if proc is None:
             return
+
+        for param in proc.using_params:
+            self.resolve_identifier(IdentifierRef(line=proc.line, col=proc.col, name=param))
 
         for sent in proc.sentences:
             self._analyze_sentence(sent)
@@ -595,7 +632,9 @@ class SemanticAnalyzer:
         elif isinstance(stmt, EvaluateStmt):
             self._check_expression(stmt.subject)
             for br in stmt.branches:
-                if isinstance(br.condition, ExprNode):
+                if isinstance(br.condition, ConditionNode):
+                    self._check_condition(br.condition)
+                elif isinstance(br.condition, ExprNode):
                     self._check_expression(br.condition)
                 for s in br.body:
                     self._analyze_statement(s)
@@ -612,9 +651,18 @@ class SemanticAnalyzer:
                 self.resolve_identifier(t)
             self._check_expression(stmt.value)
         elif isinstance(stmt, InspectStmt):
-            self.resolve_identifier(stmt.target)
+            self._check_expression(stmt.target)
             self._check_inspect_clauses(stmt)
-        elif isinstance(stmt, StopRunStmt):
+        elif isinstance(stmt, InitializeStmt):
+            for t in stmt.targets:
+                self.resolve_identifier(t)
+            for _, rep_expr in stmt.replacing:
+                self._check_expression(rep_expr)
+        elif isinstance(stmt, CallStmt):
+            self._check_expression(stmt.program)
+            for arg in stmt.using:
+                self.resolve_identifier(arg)
+        elif isinstance(stmt, (StopRunStmt, ExitStmt, ContinueStmt, GobackStmt)):
             pass
 
     def _check_inspect_clauses(self, stmt: InspectStmt) -> None:
@@ -661,7 +709,13 @@ class SemanticAnalyzer:
                         f"'{source_entry.name}' para variável puramente alfabética "
                         f"'{target_entry.name}' (PIC {target_entry.pic})",
                     )
-                elif source_entry.pic is not None and target_entry.pic is not None:
+                elif (
+                    source_entry.pic is not None
+                    and target_entry.pic is not None
+                    and isinstance(stmt.source, IdentifierRef)
+                    and stmt.source.ref_mod_start is None
+                    and target_ref.ref_mod_start is None
+                ):
                     src_sz = compute_pic_byte_size(source_entry.pic)
                     dst_sz = compute_pic_byte_size(target_entry.pic)
                     if src_sz > dst_sz:
@@ -714,7 +768,7 @@ class SemanticAnalyzer:
     # --- Regra 3: Validação de Destinos de Controle (PERFORM / GO TO) ---
 
     def _check_perform_stmt(self, stmt: PerformStmt) -> None:
-        if stmt.target not in ("<DESCONHECIDO>", "<ANONIMO>"):
+        if stmt.target is not None and stmt.target not in ("<DESCONHECIDO>", "<ANONIMO>"):
             if stmt.target not in self.procedures:
                 self.add_error(
                     stmt.line,
@@ -732,10 +786,18 @@ class SemanticAnalyzer:
                     f"referenciado em PERFORM THRU não foi declarado na PROCEDURE DIVISION",
                 )
 
+        if stmt.varying_var is not None:
+            self.resolve_identifier(stmt.varying_var)
+        if stmt.varying_from is not None:
+            self._check_expression(stmt.varying_from)
+        if stmt.varying_by is not None:
+            self._check_expression(stmt.varying_by)
         if stmt.until is not None:
             self._check_condition(stmt.until)
         if stmt.times is not None:
             self._check_expression(stmt.times)
+        for s in stmt.inline_body:
+            self._analyze_statement(s)
 
     def _check_goto_stmt(self, stmt: GoToStmt) -> None:
         if stmt.target not in ("<DESCONHECIDO>", "<ANONIMO>"):
@@ -847,6 +909,11 @@ class SemanticAnalyzer:
             return
         if isinstance(expr, IdentifierRef):
             self.resolve_identifier(expr)
+        elif isinstance(expr, LengthOfNode):
+            self.resolve_identifier(expr.target)
+        elif isinstance(expr, EvaluateRangeNode):
+            self._check_expression(expr.start)
+            self._check_expression(expr.end)
         elif isinstance(expr, FunctionCallNode):
             for arg in expr.arguments:
                 self._check_expression(arg)
@@ -860,6 +927,8 @@ class SemanticAnalyzer:
         if cond is None:
             return
         if isinstance(cond, SimpleConditionNode):
+            self._check_expression(cond.operand)
+        elif isinstance(cond, ClassConditionNode):
             self._check_expression(cond.operand)
         elif isinstance(cond, RelationConditionNode):
             self._check_expression(cond.left)
